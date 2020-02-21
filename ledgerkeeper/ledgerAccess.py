@@ -2,6 +2,11 @@ from pymongo import MongoClient
 from enum import Enum
 import click
 import datetime
+from uuid import uuid4
+import logging
+import data_service as dsvc
+from runandcliscaffold.RunAndCliScaffold import RunAndCliScaffold
+
 
 class TransactionTypes(Enum):
     APPLY_PAYMENT = 1
@@ -13,85 +18,122 @@ class TransactionTypes(Enum):
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 DATE_FORMAT = '%Y-%m-%d'
 
-def mongo_connect(mongodb_url):
-    return MongoClient(mongodb_url)
 
-def personal_finance_db(mongodb_url):
-    return mongo_connect(mongodb_url)["PersonalFinance"]
+class LedgerManager(RunAndCliScaffold):
+    def __init__(self):
+        super().__init__("TESTING")
 
-def ledger_collection(mongodb_url, testmode):
-    if testmode is None or testmode is False:
-        return personal_finance_db(mongodb_url)["ledger"]
-    else:
-        return personal_finance_db(mongodb_url)["test_ledger"]
-
-def add_ledger_to_mongo(**content):
-    error = ""
-    try:
-        date_obj = datetime.datetime.strptime(content.get('date_stamp', str(datetime.date.today()), DATE_FORMAT),
-                                              DATE_FORMAT)
-
-        document = {
-            'date_stamp': date_obj,
-            'transaction_id': content['transaction_id'],
-            'description': content['description'],
-            'transaction_category': content['transaction_category'],
-            'debit': content['debit'],
-            'credit': content['credit'],
-            'from_account': content['from_account'],
-            'from_bucket': content['from_bucket'],
-            'to_account': content['to_account'],
-            'to_bucket': content['to_bucket'],
-            'amount_covered': 0,
-            'refunded': 0,
-            'notes': content.get('notes', "")
+    def _defineFunctionsWithArgs(self):
+        return {self.add_ledger: [{"short": "ds", "long": "date_stamp", "default": datetime.datetime.now(),
+                                   "type": datetime.datetime, "help": "Ledger date of record"},
+                                  {"short": "tid", "long": "transaction_id", "required": True,
+                                   "type": str, "help": "Reference Transaction id of the ledger entry"},
+                                  {"short": "dsc", "long": "description", "type": str, "required": True,
+                                    "help": "short description of ledger item"},
+                                  {"short": "tc", "long": "transaction_category", "type": str, "required": True,
+                                    "help": "Category of the transaction for the ledger item"},
+                                  {"short": "d", "long": "debit", "type": float, "default": 0,
+                                   "help": "Debit (amount outgoing) of the ledger entry"},
+                                  {"short": "c", "long": "credit", "type": float, "default": 0,
+                                   "help": "Credit (amount incoming) of the ledger entry"},
+                                  {"short": "fa", "long": "from_account", "type": str, "required": True,
+                                   "help": "Which account is the ledger entry coming from"},
+                                  {"short": "fb", "long": "from_bucket", "type": str, "required": True,
+                                   "help": "Which bucket is the ledger entry coming from"},
+                                  {"short": "ta", "long": "to_account", "type": str, "required": True,
+                                   "help": "Which account is the ledger entry going to"},
+                                  {"short": "tb", "long": "to_bucket", "type": str, "required": True,
+                                   "help": "Which bucket is the ledger entry going to"},
+                                  {"short": "n", "long": "notes", "type": str, "default": "",
+                                   "help": "Additional notes regarding the ledger entry"},
+                                  ],
         }
 
+    def add_ledger(self, args):
+        error = ""
+        try:
+            old_ledgers = dsvc.find_ledger_by_description_date_debit(args.description
+                                                                    , args.date_stamp.date()
+                                                                    , args.debit
+                                                                    )
+            if len(old_ledgers) > 0:
+                raise Exception(
+                    f"Ledger already exists for: "
+                    f"\nDescription{args.description}"
+                    f"\nDebit{args.debit}"
+                    f"\nDate{args.date_stamp.date()}")
 
-        collection = ledger_collection(content['mongo_db_url'], content.get('testmode', None))
-        collection.insert_one(document)
+            dsvc.enter_ledger_entry(args.transaction_id
+                                    , args.description
+                                    , args.transaction_category
+                                    , args.debit
+                                    , args.credit
+                                    , args.from_account
+                                    , args.from_bucket
+                                    , args.to_account
+                                    , args.to_bucket
+                                    , args.date_stamp
+                                    , args.notes)
+            ret = "Success"
+        except ValueError as e:
+            error = f"Incorrect date format. Expected format is {DATE_FORMAT} but {args.date_stamp} was provided"
+            logging.error(error)
+            ret = "Fail"
+            raise ValueError(error)
+        except Exception as e:
+            error = f"Unable to add ledger entry: {e}"
+            logging.error(error)
+            ret = "Fail"
+            raise Exception(error)
+        finally:
+            return {"return": ret, "error": error}
+
+def _get_next_id():
+    return str(uuid4())
+
+
+
+
+def clear_ledger(**content):
+    error = ""
+    try:
+        dsvc.clear_ledger()
         ret = "Success"
-    except ValueError as e:
-        error = f"Incorrect date format. Expected format is {DATE_FORMAT} but {content.get('date_stamp')} was provided"
-        ret = "Fail"
-        raise ValueError(error)
     except Exception as e:
-        error = f"Unable to add ledger entry: {e}"
+        error = f"Unable to clear ledger: {e}"
         ret = "Fail"
         raise Exception(error)
     finally:
-        print(f"{ret} {error}")
         return {"return": ret, "error": error}
 
-@click.group(context_settings=CONTEXT_SETTINGS)
-def run():
-    pass
-
-
-@run.command()
-@click.argument('mongo_db_url', type=str)
-@click.argument('transaction_id', type=str)
-@click.argument('transaction_category', type=click.Choice([str(x.name) for x in TransactionTypes]))
-@click.argument('description', type=str)
-@click.argument('credit', type=float)
-@click.argument('debit', type=float)
-@click.argument('from_account', type=str)
-@click.argument('from_bucket', type=str)
-@click.argument('to_account', type=str)
-@click.argument('to_bucket', type=str)
-@click.option('--date_stamp', type=click.DateTime(formats=[DATE_FORMAT]), default=str(datetime.date.today()), help='specify a date for the transaction if it is not today')
-@click.option('--notes', default='', type=str, help="used to add detailed comments to the ledger entry")
-def add(**kwargs):
-    return add_ledger_to_mongo(**kwargs)
-
-@run.command()
-def get(**kwargs):
-    collection = ledger_collection()
-
-    results = collection.find()
-
-    for result in results:
-        print(result)
+def query_ledger(**query):
+    error = ""
+    try:
+        ret = dsvc.query_ledger(query)
+    except Exception as e:
+        error = f"Unable to query {e}"
+        logging.error(error)
+        ret = "Fail"
+        raise Exception(error)
+    finally:
+        return {"return": ret, "error": error}
 
 if __name__ == "__main__":
-    run()
+    import loggingConfig
+    import mongo_setup as ms
+
+    ms.global_init()
+
+    args = ['add_ledger'
+        , "--transaction_id", '1'
+        , "--transaction_category", TransactionTypes.APPLY_INCOME.name
+        , "--description", f"MY DESCRIPTION - {_get_next_id()}"
+        , "--credit", '100'
+        , "--debit", '0'
+        , "--from_account", "fAccount"
+        , "--from_bucket", "fBucket"
+        , "--to_account", "tAccount"
+        , "--to_bucket", "tBucket"]
+
+    exec = LedgerManager()
+    exec.run(args)
