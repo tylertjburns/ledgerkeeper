@@ -50,7 +50,10 @@ def clear_ledger():
     LedgerItem.drop_collection()
 
 def query_ledger(query) -> List[LedgerItem]:
-    return LedgerItem.obects(__raw__=query)
+    if query == "":
+        return LedgerItem.objects().order_by('date_stamp')
+    else:
+        return LedgerItem.obects(__raw__=query).order_by('date_stamp')
 
 if __name__ == "__main__":
 

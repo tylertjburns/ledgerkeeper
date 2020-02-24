@@ -121,7 +121,6 @@ def query_ledger(**query):
 if __name__ == "__main__":
     import loggingConfig
     import mongo_setup as ms
-
     ms.global_init()
 
     args = ['add_ledger'
@@ -136,4 +135,4 @@ if __name__ == "__main__":
         , "--to_bucket", "tBucket"]
 
     exec = LedgerManager()
-    exec.run(args)
+    exec.run()
