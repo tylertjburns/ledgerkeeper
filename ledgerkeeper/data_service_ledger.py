@@ -55,6 +55,10 @@ def query_ledger(query) -> List[LedgerItem]:
     else:
         return LedgerItem.obects(__raw__=query).order_by('date_stamp')
 
+def delete_by_id(id: str):
+    success = LedgerItem.objects(id=id).delete()
+    return success
+
 if __name__ == "__main__":
 
     import mongo_setup

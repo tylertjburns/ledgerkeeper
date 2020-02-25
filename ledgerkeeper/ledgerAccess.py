@@ -1,19 +1,9 @@
-from pymongo import MongoClient
-from enum import Enum
-import click
 import datetime
 from uuid import uuid4
 import logging
 import data_service as dsvc
 from runandcliscaffold.RunAndCliScaffold import RunAndCliScaffold
-
-
-class TransactionTypes(Enum):
-    APPLY_PAYMENT = 1
-    APPLY_INCOME = 2
-    MOVE_FUNDS = 3
-    BALANCE_BANK = 4
-
+from enums import TransactionTypes
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 DATE_FORMAT = '%Y-%m-%d'
