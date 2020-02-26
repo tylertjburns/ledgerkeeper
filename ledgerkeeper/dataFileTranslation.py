@@ -9,11 +9,18 @@ import uuid
 from dateutil import parser
 
 def _float_from_dollar_string(input):
-    return float(input.replace('$', '').replace(' ', '').replace(',', ''))
+    ret = input.replace('$', '').replace(' ', '').replace(',', '')
+
+    if ret == "" or ret is None:
+        return 0
+    else:
+        return float(ret)
+
+
 
 def read_in_pnc_transactions(filepath: str):
     # Read in the PNC data from csv
-    pnc_data = pd.read_csv(filepath)
+    pnc_data = pd.read_csv(filepath).fillna(0.0)
 
     #Translate PNC transactions to standard transaction format
     pnc_transactions = []
@@ -28,22 +35,24 @@ def read_in_pnc_transactions(filepath: str):
         else:
             debit = transaction["Debit"]
 
-        if credit >= 0:
-            transaction_category = TransactionTypes.APPLY_INCOME
+        if credit > 0:
+            transaction_category = TransactionTypes.APPLY_INCOME.name
         else:
-            transaction_category = TransactionTypes.RECORD_EXPENSE
+            transaction_category = TransactionTypes.RECORD_EXPENSE.name
 
 
 
-        new = dsvct.enter_transaction(transaction_category=str(transaction_category)
+        new = dsvct.enter_if_not_exists(transaction_category=str(transaction_category)
                                       , transaction_id=str(uuid.uuid4())
                                       , description=transaction['Transaction']
                                       , debit=debit
                                       , credit=credit
-                                      , source=str(TransactionSource.PNC)
+                                      , source=TransactionSource.PNC.name
                                       , date_stamp=parser.parse(transaction['Date']))
 
-        pnc_transactions.append(new)
+        if new is not None:
+            pnc_transactions.append(new)
+
     return pnc_transactions
 
 def read_in_barclay_transactions(filepath: str):
