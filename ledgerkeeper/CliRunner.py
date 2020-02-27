@@ -1,5 +1,7 @@
-import data_service_ledger as dsvcl
-import data_service_transaction as dsvct
+import mongoData.ledger_data_service as dsvcl
+from mongoData.transaction import Transaction
+import mongoData.transaction_data_service as dsvct
+import mongoData.account_data_service as dsvca
 import datetime
 
 import time
@@ -7,7 +9,12 @@ import pandas as pd
 import json
 import dataFileTranslation as dft
 from enum import Enum
-from enums import TransactionSource, TransactionTypes, CollectionType
+from enums import TransactionSource, TransactionTypes, CollectionType, TransactionStatus, TransactionSplitType, AccountType
+from dateutil import parser
+import uuid
+
+
+from typing import List, Dict
 
 import tkinter
 import tkinter.filedialog as fd
@@ -16,6 +23,10 @@ import tkinter.filedialog as fd
 
 NOTIMPLEMENTED = "-------------- NOT IMPLEMENTED ----------------"
 
+
+def _notify_user(text: str):
+    print(text)
+    time.sleep(1)
 
 def request_action():
     print('*******************************************************')
@@ -34,6 +45,7 @@ def request_action():
     print("")
 
     print("ADMIN")
+    print("Add [N]ew Account")
     print("[C]lear Collection")
     print("[P]rint Collection")
     print("E[X]it")
@@ -43,24 +55,26 @@ def request_action():
 def action_switch(input: str):
     switcher = {
         "A": add_ledger,
+        "C": clear_collection,
         "D": delete_a_ledger_item,
         "G": get_new_item,
         'L': load_new_transactions,
-        "Q": query_ledger,
+        'N': add_new_account,
         "P": print_collection,
-        "C": clear_collection,
-        "X": exit_app,
-        "R": process_transactions_loop
+        "Q": query_ledger,
+        "R": process_transactions_loop,
+        "X": exit_app
     }
 
     return switcher.get(input, None)
 
 def request_transaction_action():
-    print("Which do you want to do with this transaction?")
+    print("What do you want to do with this transaction?")
 
     print("[A]pprove")
     print("[D]eny")
     print("[S]plit")
+    print("Mark D[U]plicate")
     print("[B]ack to main menu")
     print("")
     return input("").upper()
@@ -69,6 +83,7 @@ def process_transaction_switch(input: str):
     switcher = {
         "A": approve_transaction,
         "D": deny_transaction,
+        "U": mark_transaction_duplicate,
         "S": split_transaction,
         "B": "return"
     }
@@ -79,8 +94,7 @@ def _request_float(prompt: str):
         try:
             return float(input(prompt))
         except:
-            print("invalid float format")
-            time.sleep(1)
+            _notify_user("invalid float format")
 
 def _request_guid(prompt: str):
     while True:
@@ -88,8 +102,7 @@ def _request_guid(prompt: str):
         if (len(inp)) == 24:
             return inp
         else:
-            print("Invalid Guid...")
-            time.sleep(1)
+            _notify_user("Invalid Guid...")
 
 def _request_date():
 
@@ -107,24 +120,73 @@ def _request_date():
 
     return date_stamp
 
+def _request_from_dict(selectionDict: Dict[int, str], prompt = None) -> str:
+    if prompt is None:
+        prompt = ""
+
+    print(prompt)
+    for key in selectionDict:
+        print (f"{key} -- {selectionDict[key]}")
+
+    while True:
+        inp = _int_tryParse(input(""))
+
+        if inp and selectionDict.get(inp, None) is not None:
+            return selectionDict[inp]
+        else:
+            print("Invalid Entry")
+
+def _int_tryParse(value):
+    try:
+        return int(value)
+    except:
+        return False
+
 def _request_enum(enum):
     while True:
         if issubclass(enum, Enum):
-            inp = input(f"Enter {enum.__name__} {[i.name for i in enum]}:").upper()
-            if not enum.has_value(inp):
-                print(f"Invalid Entry. Select from {[i.name for i in enum]}")
-            else:
+            print(f"Enter {enum.__name__}:")
+            for i in enum:
+                print(f"{i.value} -- {i.name}")
+            inp = input("")
+
+            enum_num = _int_tryParse(inp)
+            if enum_num and enum.has_value(enum_num):
+                return enum(enum_num).name
+            elif not enum_num and enum.has_name(inp):
                 return inp
+            else:
+                print(f"Invalid Entry...")
+
         else:
             raise TypeError(f"Input must be of type Enum but {type(enum)} was provided")
 
 
-def _pretty_print_json_items(json_items):
+def _pretty_print_json_items(json_items, title=None):
     data = pd.io.json.json_normalize(json.loads(json_items))
-    print(f"# of items {len(data)}")
+    if title is None:
+        title = ""
+    else:
+        title = title + "\n"
+
+    print(f"{title}# of items {len(data)}")
     if len(data) > 0:
         with pd.option_context('display.max_columns', 2000, 'display.width', 250):
             print(data)
+
+def add_new_account():
+    print('******************** NEW ACCOUNT ********************')
+    type = _request_enum(AccountType)
+    name = input("Account Name:")
+    description = input("Description:")
+
+    account = dsvca.enter_if_not_exists(name=name, type=type, description=description)
+
+    if account is not None:
+        _notify_user("Account created successfully!")
+    else:
+        _notify_user(f"Error creating account. An account with the name {name} already exists.")
+
 
 def add_ledger():
     print('******************** ADD LEDGER ********************')
@@ -196,8 +258,7 @@ def clear_collection():
     else:
         print(NOTIMPLEMENTED)
 
-    print(f"{collection} collection cleared\n")
-    time.sleep(1)
+    _notify_user(f"{collection} collection cleared\n")
 
 def delete_a_ledger_item():
     print('******************** DELETE A LEDGER ITEM ********************')
@@ -205,16 +266,44 @@ def delete_a_ledger_item():
 
     success = dsvcl.delete_by_id(id)
     if success == 1:
-        print(f"Ledger item {id} deleted")
+        _notify_user(f"Ledger item {id} deleted")
     else:
-        print(f"Ledger with id {id} not found")
-        time.sleep(1)
+        _notify_user(f"Ledger with id {id} not found")
 
 def exit_app():
     print('******************** EXIT APP ********************')
-    print("Goodbye!!")
-    time.sleep(1)
+    _notify_user("Goodbye!!")
     raise KeyboardInterrupt()
+
+def process_transaction(transaction: Transaction):
+    # Print the Transaction
+    _pretty_print_json_items(transaction.to_json(), title="Transaction to Handle")
+    print("")
+
+    # Show potential duplicates
+    _pretty_print_json_items(
+        dsvcl.find_ledger_by_date_debit_credit(transaction.date_stamp, transaction.debit, transaction.credit).to_json()
+        , title="Potential Duplicates")
+    print("")
+
+    while True:
+        # Request direction from user
+        action = process_transaction_switch(request_transaction_action())
+
+        # Process input
+        if action is None:
+            # Invalid entry
+            _notify_user("Invalid Entry...")
+        elif action == 'return':
+            # Return early if the user wants
+            return False
+        else:
+            # Process valid action on transaction
+            action(transaction)
+            return True
+
+
+
 
 def process_transactions_loop():
     print('******************** Process Transaction ********************')
@@ -228,27 +317,12 @@ def process_transactions_loop():
 
         # Select and Print the transaction
         transaction = unhandled_transactions[0]
-        _pretty_print_json_items(transaction.to_json())
-
-        # Request direction from user
-        action = process_transaction_switch(request_transaction_action())
-
-        # Process input
-        if action is None:
-            # Invalid entry
-            print("Invalid Entry...")
-        elif action == 'return':
-            # Return early if the user wants
+        result = process_transaction(transaction)
+        if not result:
             return
-        else:
-            # Process valid action on transaction
-            action(transaction)
-
-        time.sleep(1)
 
     # Signal that all transactions have been handled
-    print("No more transactions to process")
-    time.sleep(1)
+    _notify_user("No more transactions to process")
 
 
 def load_new_transactions():
@@ -272,27 +346,76 @@ def load_new_transactions():
     # Close TKinter app
     root.destroy()
 
-    print(f"Number of New Transactions: {len(transactions)}")
-    time.sleep(1)
+    _notify_user(f"Number of New Transactions: {len(transactions)}")
+
+def split_transaction(transaction: Transaction):
+
+    input = _request_enum(TransactionSplitType)
+    if transaction.credit > 0 and transaction.debit == 0:
+        currentAmount= transaction.credit
+    elif transaction.debit > 0 and transaction.credit == 0:
+        currentAmount = transaction.debit
+    else:
+        raise NotImplementedError("Unable to handle transactions with both credit and debit values")
+
+    if input == TransactionSplitType.PERCENTAGE.name:
+        perc = _request_float("% of current to handle [0-100]:")
+        amt = max(min(round(currentAmount * perc / 100, 2), currentAmount), 0)
+    elif input == TransactionSplitType.DOLLAR.name:
+        amt = max(min(_request_float(f"Amount to handle [up to {currentAmount}]:"), currentAmount), 0)
+    else:
+        raise NotImplementedError(f"{input} is not implemented as a TransactionSplitType")
 
 
-def split_transaction(transaction):
-    print(NOTIMPLEMENTED)
+    if transaction.credit > 0:
+        newdeb1 = 0.0
+        newdeb2 = 0.0
+        newcred1 = amt
+        newcred2 = transaction.credit - amt
+    elif transaction.debit > 0:
+        newdeb1 = amt
+        newdeb2 = transaction.debit - amt
+        newcred1 = 0.0
+        newcred2 = 0.0
+    else:
+        raise NotImplementedError("Unknown Scenario for splits")
+
+    newTransaction1 = dsvct.enter_if_not_exists(transaction_category=transaction.category
+                                    , transaction_id=str(uuid.uuid4())
+                                    , description=transaction.description
+                                    , debit=newdeb1
+                                    , credit=newcred1
+                                    , source=transaction.source
+                                    , date_stamp=transaction.date_stamp)
+    newTransaction2 = dsvct.enter_if_not_exists(transaction_category=transaction.category
+                                    , transaction_id=str(uuid.uuid4())
+                                    , description=transaction.description
+                                    , debit=newdeb2
+                                    , credit=newcred2
+                                    , source=transaction.source
+                                    , date_stamp=transaction.date_stamp)
+    dsvct.mark_transaction_handled(transaction, TransactionStatus.SPLIT)
+
+    _notify_user("Transaction Split")
 
 def deny_transaction(transaction):
-    dsvct.mark_transaction_handled(transaction, status=-1)
-    print("Transaction denied...")
-    time.sleep(1)
+    dsvct.mark_transaction_handled(transaction, status=TransactionStatus.DENIED)
+    _notify_user("Transaction denied...")
+    
+def mark_transaction_duplicate(transaction):
+    dsvct.mark_transaction_handled(transaction, status=TransactionStatus.DUPLICATE)
+    _notify_user("Marked as Duplicate...")
 
 def approve_transaction(transaction):
+    accounts = dsvca.query('')
 
     if transaction.credit > 0 and transaction.debit == 0:
         from_account = transaction.description
         from_bucket = "income_source"
-        to_account = input("To Account:")
+        to_account = _request_from_dict(({i + 1: accounts[i].account_name for i in range(0, len(accounts))}), prompt="To Account:")
         to_bucket = input("To Bucket:")
     elif transaction.credit == 0 and transaction.debit > 0:
-        from_account = input("From Account:")
+        from_account = _request_from_dict(({i + 1: accounts[i].account_name for i in range(0, len(accounts))}), prompt="From Account:")
         from_bucket = input("From Bucket:")
         to_account = transaction.description
         to_bucket = "expense_source"
@@ -316,7 +439,7 @@ def approve_transaction(transaction):
     if ledger is None:
         print("Ledger item already exists")
     else:
-        print("Ledger Entry added successfully")
+        _notify_user("Ledger Entry added successfully")
         dsvct.mark_transaction_handled(transaction)
 
 
@@ -329,5 +452,4 @@ if __name__ == "__main__":
         if action is not None:
             action()
         else:
-            print("Invalid Entry...")
-            time.sleep(1)
+            _notify_user("Invalid Entry...")

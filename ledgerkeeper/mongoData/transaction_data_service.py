@@ -1,4 +1,5 @@
 from mongoData.transaction import Transaction
+from enums import TransactionStatus
 import datetime
 from typing import List
 
@@ -41,6 +42,7 @@ def enter_transaction(transaction_id: str,
     transaction.credit = credit
     transaction.date_stamp = date_stamp
     transaction.source = source
+    transaction.handled = TransactionStatus.UNHANDLED.name
 
     transaction.save()
 
@@ -53,7 +55,7 @@ def query(query) -> List[Transaction]:
         return Transaction.obects(__raw__=query).order_by('date_stamp')
 
 def unhandled_transactions() -> List[Transaction]:
-    return Transaction.objects(handled=0).order_by('date_stamp')
+    return Transaction.objects(handled=TransactionStatus.UNHANDLED.name).order_by('date_stamp')
 
 def clear_collection():
     Transaction.drop_collection()
@@ -75,5 +77,8 @@ def find_by_description_date_debit_credit(description: str, date: datetime.date,
 
     return transactions
 
-def mark_transaction_handled(transaction: Transaction, status=1) -> Transaction:
-    Transaction.objects(transaction_id=transaction.id).update_one(handled=status)
+def mark_transaction_handled(transaction: Transaction, status=TransactionStatus.HANDLED) -> Transaction:
+    Transaction.objects(transaction_id=transaction.id).update_one(handled=status.name)
+
+
+

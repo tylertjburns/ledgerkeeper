@@ -13,7 +13,7 @@ class Transaction(mongoengine.Document):
     debit = mongoengine.FloatField(required=True)
     credit = mongoengine.FloatField(required=True)
 
-    handled = mongoengine.IntField(default=0)
+    handled = mongoengine.StringField(required=True)
     # Embedded Documents
 
     # Meta

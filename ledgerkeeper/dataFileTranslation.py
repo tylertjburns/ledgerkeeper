@@ -2,9 +2,8 @@ import pandas as pd
 import os
 import sys
 import decimal
-from enums import TransactionTypes
-from enums import TransactionSource
-import data_service_transaction as dsvct
+from enums import TransactionTypes, TransactionSource, TransactionStatus
+import mongoData.transaction_data_service as dsvct
 import uuid
 from dateutil import parser
 
@@ -36,13 +35,13 @@ def read_in_pnc_transactions(filepath: str):
             debit = transaction["Debit"]
 
         if credit > 0:
-            transaction_category = TransactionTypes.APPLY_INCOME.name
+            transaction_category = TransactionTypes.APPLY_INCOME
         else:
-            transaction_category = TransactionTypes.RECORD_EXPENSE.name
+            transaction_category = TransactionTypes.RECORD_EXPENSE
 
 
 
-        new = dsvct.enter_if_not_exists(transaction_category=str(transaction_category)
+        new = dsvct.enter_if_not_exists(transaction_category=transaction_category.name
                                       , transaction_id=str(uuid.uuid4())
                                       , description=transaction['Transaction']
                                       , debit=debit
@@ -77,14 +76,25 @@ def read_in_barclay_transactions(filepath: str):
         else:
             raise Exception(f"Unhandled transaction category for BarclaycardUS: {transaction['Category']}")
 
-        barclay_transactions.append(create_standard_transaction(**{
-            "datestamp": transaction['Transaction Date'],
-            "source": "BarclayCardUs",
-            "debit": debit,
-            "credit": credit,
-            "description": transaction['Description'],
-            "category": transaction_category
-        }))
+        new = dsvct.enter_if_not_exists(transaction_category=transaction_category.name
+                                      , transaction_id=str(uuid.uuid4())
+                                      , description=transaction['Description']
+                                      , debit=debit
+                                      , credit=credit
+                                      , source=TransactionSource.BARCLAYCARDUS.name
+                                      , date_stamp=parser.parse(transaction['Transaction Date']))
+
+        if new is not None:
+            barclay_transactions.append(new)
+
+        # barclay_transactions.append(create_standard_transaction(**{
+        #     "datestamp": transaction['Transaction Date'],
+        #     "source": "BarclayCardUs",
+        #     "debit": debit,
+        #     "credit": credit,
+        #     "description": transaction['Description'],
+        #     "category": transaction_category
+        # }))
 
     return barclay_transactions
 
