@@ -1,4 +1,5 @@
 import mongoengine
+from mongoData.bucket import Bucket
 
 class Account(mongoengine.Document):
 
@@ -9,9 +10,11 @@ class Account(mongoengine.Document):
 
 
     # Embedded Documents
+    buckets = mongoengine.EmbeddedDocumentListField(Bucket)
 
     # Meta
     meta = {
         'db_alias': 'core',
         'collection': 'accounts'
     }
+

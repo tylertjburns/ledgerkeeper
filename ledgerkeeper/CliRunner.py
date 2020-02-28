@@ -9,7 +9,7 @@ import pandas as pd
 import json
 import dataFileTranslation as dft
 from enum import Enum
-from enums import TransactionSource, TransactionTypes, CollectionType, TransactionStatus, TransactionSplitType, AccountType
+from enums import TransactionSource, TransactionTypes, CollectionType, TransactionStatus, TransactionSplitType, AccountType, SpendCategory
 from dateutil import parser
 import uuid
 
@@ -44,6 +44,10 @@ def request_action():
     print("P[R]ocess new transactions")
     print("")
 
+    print("BUCKETS")
+    print("Add Buc[K]et to account")
+    print("")
+
     print("ADMIN")
     print("Add [N]ew Account")
     print("[C]lear Collection")
@@ -58,6 +62,7 @@ def action_switch(input: str):
         "C": clear_collection,
         "D": delete_a_ledger_item,
         "G": get_new_item,
+        "K": add_bucket_to_account,
         'L': load_new_transactions,
         'N': add_new_account,
         "P": print_collection,
@@ -96,6 +101,7 @@ def _request_float(prompt: str):
         except:
             _notify_user("invalid float format")
 
+
 def _request_guid(prompt: str):
     while True:
         inp = input(prompt)
@@ -103,6 +109,15 @@ def _request_guid(prompt: str):
             return inp
         else:
             _notify_user("Invalid Guid...")
+
+def _request_int(prompt: str):
+    while True:
+        ret = _int_tryParse(input(prompt))
+        if ret:
+            return ret
+        else:
+            _notify_user("Invalid Integer...")
+
 
 def _request_date():
 
@@ -162,8 +177,22 @@ def _request_enum(enum):
             raise TypeError(f"Input must be of type Enum but {type(enum)} was provided")
 
 
-def _pretty_print_json_items(json_items, title=None):
-    data = pd.io.json.json_normalize(json.loads(json_items))
+
+
+def _pretty_print_items(items, title=None):
+    if type(items) == str:
+        data = pd.io.json.json_normalize(json.loads(items))
+    elif type(items) is list:
+        jsonstr = "{ \"data\": ["
+        for item in items:
+            jsonstr += item + ", "
+        jsonstr = jsonstr[:-2] + "]}"
+        jsonstr = json.loads(jsonstr)
+        data = pd.io.json.json_normalize(jsonstr, record_path='data')
+    else:
+        raise NotImplementedError(f"Unhandled printable object {type(items)}")
+
+
     if title is None:
         title = ""
     else:
@@ -237,10 +266,16 @@ def print_collection():
 
     if CollectionType[print_type] == CollectionType.LEDGER:
         items_json = dsvcl.query_ledger("").to_json()
-        _pretty_print_json_items(items_json)
+        print(type(dsvcl.query_ledger("")))
+        _pretty_print_items(items_json, title=CollectionType.LEDGER.name)
     elif CollectionType[print_type] == CollectionType.TRANSACTIONS:
         items_json = dsvct.query("").to_json()
-        _pretty_print_json_items(items_json)
+        _pretty_print_items(items_json, title=CollectionType.TRANSACTIONS.name)
+    elif CollectionType[print_type] == CollectionType.BUCKETS:
+        account = _request_from_dict(dsvca.accounts_as_dict())
+        _pretty_print_items(dsvca.buckets_by_account(dsvca.account_by_name(account)), title=CollectionType.BUCKETS.name)
+    elif CollectionType[print_type] == CollectionType.ACCOUNTS:
+        _pretty_print_items(dsvca.query_account("").to_json(), title=CollectionType.ACCOUNTS.name)
     else:
         print(NOTIMPLEMENTED)
 
@@ -277,11 +312,11 @@ def exit_app():
 
 def process_transaction(transaction: Transaction):
     # Print the Transaction
-    _pretty_print_json_items(transaction.to_json(), title="Transaction to Handle")
+    _pretty_print_items(transaction.to_json(), title="Transaction to Handle")
     print("")
 
     # Show potential duplicates
-    _pretty_print_json_items(
+    _pretty_print_items(
         dsvcl.find_ledger_by_date_debit_credit(transaction.date_stamp, transaction.debit, transaction.credit).to_json()
         , title="Potential Duplicates")
     print("")
@@ -396,7 +431,7 @@ def split_transaction(transaction: Transaction):
                                     , date_stamp=transaction.date_stamp)
     dsvct.mark_transaction_handled(transaction, TransactionStatus.SPLIT)
 
-    _notify_user("Transaction Split")
+    _notify_user(f"Transaction Split into {newTransaction1.id} and {newTransaction2.id}")
 
 def deny_transaction(transaction):
     dsvct.mark_transaction_handled(transaction, status=TransactionStatus.DENIED)
@@ -407,15 +442,13 @@ def mark_transaction_duplicate(transaction):
     _notify_user("Marked as Duplicate...")
 
 def approve_transaction(transaction):
-    accounts = dsvca.query('')
-
     if transaction.credit > 0 and transaction.debit == 0:
         from_account = transaction.description
         from_bucket = "income_source"
-        to_account = _request_from_dict(({i + 1: accounts[i].account_name for i in range(0, len(accounts))}), prompt="To Account:")
+        to_account = _request_from_dict(dsvca.accounts_as_dict(), prompt="To Account:")
         to_bucket = input("To Bucket:")
     elif transaction.credit == 0 and transaction.debit > 0:
-        from_account = _request_from_dict(({i + 1: accounts[i].account_name for i in range(0, len(accounts))}), prompt="From Account:")
+        from_account = _request_from_dict(dsvca.accounts_as_dict(), prompt="From Account:")
         from_bucket = input("From Bucket:")
         to_account = transaction.description
         to_bucket = "expense_source"
@@ -441,6 +474,22 @@ def approve_transaction(transaction):
     else:
         _notify_user("Ledger Entry added successfully")
         dsvct.mark_transaction_handled(transaction)
+
+def add_bucket_to_account():
+    account = _request_from_dict(dsvca.accounts_as_dict(), prompt="Select an account:")
+    name = input("Name:")
+    prio = _request_int("Priority:")
+    due_day = _request_int("Due day of month:")
+    category = _request_enum(SpendCategory)
+
+
+    bucket = dsvca.add_bucket_to_account(dsvca.account_by_name(account_name=account)
+                                , name=name
+                                , priority=prio
+                                , due_day_of_month=due_day
+                                , spend_category=category
+                                )
+    _notify_user(f"Bucket {bucket.name} added to {account} successfully.")
 
 
 if __name__ == "__main__":

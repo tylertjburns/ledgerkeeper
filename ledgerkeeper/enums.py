@@ -1,5 +1,4 @@
 from enum import Enum
-from abc import ABC, abstractmethod
 
 
 class TransactionTypes(Enum):
@@ -48,6 +47,8 @@ class TransactionStatus(Enum):
 class CollectionType(Enum):
     LEDGER = 1
     TRANSACTIONS = 2
+    ACCOUNTS = 3
+    BUCKETS = 4
 
     @classmethod
     def has_name(cls, name):
@@ -72,6 +73,37 @@ class TransactionSplitType(Enum):
 class AccountType(Enum):
     PERSONAL = 1
     BUSINESS = 2
+
+    @classmethod
+    def has_name(cls, name):
+        return name in AccountType._member_names_
+
+    @classmethod
+    def has_value(cls, value):
+        return value in set([item.value for item in AccountType])
+
+class SpendCategory(Enum):
+    INVESTMENT = 1
+    RENT_MORTGAGE =2
+    GROCERIES =3
+    CHARITY =4
+    CARPAYMENT=5
+    CARMAINT = 6
+    FUN =7
+    SPENDINGALLOWANCE=8
+    OTHER=9
+    LOANPAYMENT = 10
+    FUEL = 11
+    PHONE = 12
+    UTILITIES = 13
+    PETS = 14
+    CARINSURANCE = 15
+    LIFEINSURANCE = 16
+    GENERALLIVINGEXPENSE = 17
+    FOOD = 18
+    VACATION = 19
+    GENERALHOMEEXPENSE = 20
+    MEDICAL = 21
 
     @classmethod
     def has_name(cls, name):
