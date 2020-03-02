@@ -14,8 +14,10 @@ def enter_if_not_exists(
     from_bucket: str,
     to_account: str,
     to_bucket: str,
+    spend_category: str,
     date_stamp: datetime.datetime = datetime.datetime.now,
-    notes: str = "")->LedgerItem:
+    notes: str = "",
+    source: str = "")->LedgerItem:
 
 
     ledgers = find_ledger_by_description_date_debit_credit(description, date_stamp, debit, credit)
@@ -32,8 +34,10 @@ def enter_if_not_exists(
                             , from_bucket
                             , to_account
                             , to_bucket
-                            , date_stamp
-                            , notes)
+                            , spend_category=spend_category
+                            , date_stamp=date_stamp
+                            , notes=notes
+                            , source=source)
 
 
 def enter_ledger_entry(transaction_id: str,
@@ -45,8 +49,10 @@ def enter_ledger_entry(transaction_id: str,
     from_bucket: str,
     to_account: str,
     to_bucket: str,
+    spend_category: str,
     date_stamp: datetime.datetime = datetime.datetime.now,
-    notes: str = "") -> LedgerItem:
+    notes: str = "",
+    source: str = "") -> LedgerItem:
 
     ledger = LedgerItem()
     ledger.transaction_id = transaction_id
@@ -59,7 +65,9 @@ def enter_ledger_entry(transaction_id: str,
     ledger.to_account = to_account
     ledger.to_bucket = to_bucket
     ledger.date_stamp = date_stamp
+    ledger.spend_category = spend_category
     ledger.notes = notes
+    ledger.source = source
 
     ledger.save()
 

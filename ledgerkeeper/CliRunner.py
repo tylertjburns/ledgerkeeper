@@ -2,31 +2,24 @@ import mongoData.ledger_data_service as dsvcl
 from mongoData.transaction import Transaction
 import mongoData.transaction_data_service as dsvct
 import mongoData.account_data_service as dsvca
-import datetime
 
-import time
-import pandas as pd
-import json
 import dataFileTranslation as dft
-from enum import Enum
 from enums import TransactionSource, TransactionTypes, CollectionType, TransactionStatus, TransactionSplitType, AccountType, SpendCategory
-from dateutil import parser
 import uuid
 
-
-from typing import List, Dict
-
-import tkinter
-import tkinter.filedialog as fd
-
+from plotter import plot_history_by_category
+from cliHelper import _notify_user, \
+    _request_filepath,\
+    _request_from_dict, \
+    _request_enum, \
+    _request_float, \
+    _request_int, \
+    _request_date,\
+    _pretty_print_items
 
 
 NOTIMPLEMENTED = "-------------- NOT IMPLEMENTED ----------------"
 
-
-def _notify_user(text: str):
-    print(text)
-    time.sleep(1)
 
 def request_action():
     print('*******************************************************')
@@ -52,6 +45,7 @@ def request_action():
     print("Add [N]ew Account")
     print("[C]lear Collection")
     print("[P]rint Collection")
+    print("Pl[O]t options")
     print("E[X]it")
     print("")
     return input("").upper()
@@ -65,6 +59,7 @@ def action_switch(input: str):
         "K": add_bucket_to_account,
         'L': load_new_transactions,
         'N': add_new_account,
+        'O': plot_request_loop,
         "P": print_collection,
         "Q": query_ledger,
         "R": process_transactions_loop,
@@ -94,114 +89,21 @@ def process_transaction_switch(input: str):
     }
     return switcher.get(input, None)
 
-def _request_float(prompt: str):
-    while True:
-        try:
-            return float(input(prompt))
-        except:
-            _notify_user("invalid float format")
 
+def plot_request_action():
+    print("What do you want to plot?")
 
-def _request_guid(prompt: str):
-    while True:
-        inp = input(prompt)
-        if (len(inp)) == 24:
-            return inp
-        else:
-            _notify_user("Invalid Guid...")
+    print("[H]istory by Category")
+    print("[B]ack to main menu")
+    print("")
+    return input("").upper()
 
-def _request_int(prompt: str):
-    while True:
-        ret = _int_tryParse(input(prompt))
-        if ret:
-            return ret
-        else:
-            _notify_user("Invalid Integer...")
-
-
-def _request_date():
-
-    while True:
-        inp = input("Enter date [Enter for current date]:")
-        try:
-            if inp == '':
-                date_stamp = datetime.datetime.now()
-                print(f"using: {date_stamp}")
-            else:
-                date_stamp = parser.parse(inp)
-            break
-        except:
-            print("invalid date format")
-
-    return date_stamp
-
-def _request_from_dict(selectionDict: Dict[int, str], prompt = None) -> str:
-    if prompt is None:
-        prompt = ""
-
-    print(prompt)
-    for key in selectionDict:
-        print (f"{key} -- {selectionDict[key]}")
-
-    while True:
-        inp = _int_tryParse(input(""))
-
-        if inp and selectionDict.get(inp, None) is not None:
-            return selectionDict[inp]
-        else:
-            print("Invalid Entry")
-
-def _int_tryParse(value):
-    try:
-        return int(value)
-    except:
-        return False
-
-def _request_enum(enum):
-    while True:
-        if issubclass(enum, Enum):
-            print(f"Enter {enum.__name__}:")
-            for i in enum:
-                print(f"{i.value} -- {i.name}")
-            inp = input("")
-
-            enum_num = _int_tryParse(inp)
-            if enum_num and enum.has_value(enum_num):
-                return enum(enum_num).name
-            elif not enum_num and enum.has_name(inp):
-                return inp
-            else:
-                print(f"Invalid Entry...")
-
-        else:
-            raise TypeError(f"Input must be of type Enum but {type(enum)} was provided")
-
-
-
-
-def _pretty_print_items(items, title=None):
-    if type(items) == str:
-        data = pd.io.json.json_normalize(json.loads(items))
-    elif type(items) is list:
-        jsonstr = "{ \"data\": ["
-        for item in items:
-            jsonstr += item + ", "
-        jsonstr = jsonstr[:-2] + "]}"
-        jsonstr = json.loads(jsonstr)
-        data = pd.io.json.json_normalize(jsonstr, record_path='data')
-    else:
-        raise NotImplementedError(f"Unhandled printable object {type(items)}")
-
-
-    if title is None:
-        title = ""
-    else:
-        title = title + "\n"
-
-    print(f"{title}# of items {len(data)}")
-    if len(data) > 0:
-        with pd.option_context('display.max_columns', 2000, 'display.width', 250):
-            print(data)
+def plot_switch(input: str):
+    switcher = {
+        "H": plot_history_by_category,
+        "B": "return"
+    }
+    return switcher.get(input, None)
 
 def add_new_account():
     print('******************** NEW ACCOUNT ********************')
@@ -221,13 +123,14 @@ def add_ledger():
     print('******************** ADD LEDGER ********************')
     transaction_id = input("Transaction Id:")
     description = input("Description:")
-    transaction_category = input("Transaction Category:")
+    transaction_category = _request_enum(TransactionTypes)
     debit = _request_float("Debit:")
     credit = _request_float("Credit:")
-    from_account = input("From Account:")
-    from_bucket = input("From Bucket:")
-    to_account = input("To Account:")
-    to_bucket = input("To Bucket:")
+    from_account = dsvca.accounts_as_dict("From Account:")
+    from_bucket = _request_from_dict(dsvca.buckets_as_dict_by_account(from_account), "From Bucket:")
+    to_account = dsvca.accounts_as_dict("To Account:")
+    to_bucket = _request_from_dict(dsvca.buckets_as_dict_by_account(to_account), "To Bucket:")
+    spend_category = _request_enum(SpendCategory)
     date_stamp = _request_date()
     notes = input("Notes:")
 
@@ -240,8 +143,9 @@ def add_ledger():
                             , from_bucket
                             , to_account
                             , to_bucket
-                            , date_stamp
-                            , notes)
+                            , spend_category=spend_category
+                            , date_stamp=date_stamp
+                            , notes=notes)
 
     if ledger is None:
         print("Ledger item already exists")
@@ -266,7 +170,6 @@ def print_collection():
 
     if CollectionType[print_type] == CollectionType.LEDGER:
         items_json = dsvcl.query_ledger("").to_json()
-        print(type(dsvcl.query_ledger("")))
         _pretty_print_items(items_json, title=CollectionType.LEDGER.name)
     elif CollectionType[print_type] == CollectionType.TRANSACTIONS:
         items_json = dsvct.query("").to_json()
@@ -339,6 +242,24 @@ def process_transaction(transaction: Transaction):
 
 
 
+def plot_request_loop():
+    print('******************** Plotting ********************')
+
+    while True:
+        # Request direction from user
+        action = plot_switch(plot_request_action())
+
+        # Process input
+        if action is None:
+            # Invalid entry
+            _notify_user("Invalid Entry...")
+        elif action == 'return':
+            # Return early if the user wants
+            return False
+        else:
+            # Process valid action on transaction
+            action()
+            return True
 
 def process_transactions_loop():
     print('******************** Process Transaction ********************')
@@ -360,28 +281,29 @@ def process_transactions_loop():
     _notify_user("No more transactions to process")
 
 
+
 def load_new_transactions():
     print('******************** Load New Transactions ********************')
 
     # Ask User for source
     source = _request_enum(TransactionSource)
 
-    # Find File Path
-    root = tkinter.Tk()
-    in_path = fd.askopenfilename()
+    # Get Filepath
+    in_path = _request_filepath()
 
     # React to user input
     if TransactionSource[source] == TransactionSource.BARCLAYCARDUS:
         transactions = dft.read_in_barclay_transactions(in_path)
     elif TransactionSource[source] == TransactionSource.PNC:
         transactions = dft.read_in_pnc_transactions(in_path)
+    elif TransactionSplitType[source] == TransactionSource.ARCHIVE:
+        account = _request_from_dict(dsvca.accounts_as_dict())
+        transactions = dft.read_in_old_ledgers(filepath=in_path, account=dsvca.account_by_name(account))
+        _notify_user("Ledger Items created directly")
     else:
         print(NOTIMPLEMENTED)
 
-    # Close TKinter app
-    root.destroy()
-
-    _notify_user(f"Number of New Transactions: {len(transactions)}")
+    _notify_user(f"{len(transactions)} new Transactions from {source}")
 
 def split_transaction(transaction: Transaction):
 
@@ -446,12 +368,14 @@ def approve_transaction(transaction):
         from_account = transaction.description
         from_bucket = "income_source"
         to_account = _request_from_dict(dsvca.accounts_as_dict(), prompt="To Account:")
-        to_bucket = input("To Bucket:")
+        to_bucket = _request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(to_account)), "To Bucket:")
+        spend_category = "NA"
     elif transaction.credit == 0 and transaction.debit > 0:
         from_account = _request_from_dict(dsvca.accounts_as_dict(), prompt="From Account:")
-        from_bucket = input("From Bucket:")
+        from_bucket = _request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(from_account)), "From Bucket:")
         to_account = transaction.description
         to_bucket = "expense_source"
+        spend_category = dsvca.spend_category_by_bucket_name(from_bucket)
     else:
         raise NotImplementedError(f"Unhandled combination of credit and debit values: debit [{transaction.debit}], credit [{transaction.credit}]")
 
@@ -466,8 +390,10 @@ def approve_transaction(transaction):
                                        , from_bucket=from_bucket
                                        , to_account=to_account
                                        , to_bucket=to_bucket
+                                       , spend_category=spend_category
                                        , date_stamp=transaction.date_stamp
-                                       , notes=notes)
+                                       , notes=notes
+                                       , source=transaction.source)
 
     if ledger is None:
         print("Ledger item already exists")
@@ -481,6 +407,7 @@ def add_bucket_to_account():
     prio = _request_int("Priority:")
     due_day = _request_int("Due day of month:")
     category = _request_enum(SpendCategory)
+    base_budget_amount = _request_float("Base budget amount:")
 
 
     bucket = dsvca.add_bucket_to_account(dsvca.account_by_name(account_name=account)
@@ -488,6 +415,7 @@ def add_bucket_to_account():
                                 , priority=prio
                                 , due_day_of_month=due_day
                                 , spend_category=category
+                                , base_budget_amount=base_budget_amount
                                 )
     _notify_user(f"Bucket {bucket.name} added to {account} successfully.")
 

@@ -20,6 +20,7 @@ class TransactionTypes(Enum):
 class TransactionSource(Enum):
     PNC = 1
     BARCLAYCARDUS = 2
+    ARCHIVE = 3
 
     @classmethod
     def has_name(cls, name):

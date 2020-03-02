@@ -10,7 +10,8 @@ def enter_if_not_exists(transaction_id: str,
     debit: float,
     credit: float,
     source: str,
-    date_stamp: datetime.datetime = datetime.datetime.now) -> Transaction:
+    date_stamp: datetime.datetime = datetime.datetime.now,
+    handled = TransactionStatus.UNHANDLED.name ) -> Transaction:
 
     transactions = find_by_description_date_debit_credit(description, date_stamp, debit, credit)
 
@@ -24,6 +25,7 @@ def enter_if_not_exists(transaction_id: str,
                                   , credit
                                   , source
                                   , date_stamp
+                                  , handled
                                  )
 
 def enter_transaction(transaction_id: str,
@@ -32,7 +34,8 @@ def enter_transaction(transaction_id: str,
     debit: float,
     credit: float,
     source: str,
-    date_stamp: datetime.datetime = datetime.datetime.now) -> Transaction:
+    date_stamp: datetime.datetime = datetime.datetime.now,
+    handled = TransactionStatus.UNHANDLED.name) -> Transaction:
 
     transaction = Transaction()
     transaction.id = transaction_id
@@ -42,7 +45,7 @@ def enter_transaction(transaction_id: str,
     transaction.credit = credit
     transaction.date_stamp = date_stamp
     transaction.source = source
-    transaction.handled = TransactionStatus.UNHANDLED.name
+    transaction.handled = handled
 
     transaction.save()
 

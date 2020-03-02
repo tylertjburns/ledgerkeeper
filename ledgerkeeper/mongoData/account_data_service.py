@@ -76,7 +76,7 @@ def buckets_by_account(account:Account) -> List[Bucket]:
     buckets = Account.objects(id=account.id).first().buckets
 
     bucket_list =[
-        bucket.to_json() for bucket in buckets
+        bucket for bucket in buckets
     ]
 
     return bucket_list
@@ -86,3 +86,9 @@ def buckets_by_account(account:Account) -> List[Bucket]:
 def buckets_as_dict_by_account(account: Account) -> Dict[int, str]:
     buckets = buckets_by_account(account)
     return {i + 1: buckets[i].name for i in range(0, len(buckets))}
+
+def bucket_by_name(bucket_name: str) -> Bucket:
+    return Bucket.objects(name = bucket_name).first()
+
+def spend_category_by_bucket_name(bucket_name) -> str:
+    return bucket_by_name(bucket_name).spend_category

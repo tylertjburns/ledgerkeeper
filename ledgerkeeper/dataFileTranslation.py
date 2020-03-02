@@ -1,11 +1,10 @@
 import pandas as pd
-import os
-import sys
-import decimal
 from enums import TransactionTypes, TransactionSource, TransactionStatus
 import mongoData.transaction_data_service as dsvct
+import mongoData.ledger_data_service as dsvcl
 import uuid
 from dateutil import parser
+from mongoData.account import Account
 
 def _float_from_dollar_string(input):
     ret = input.replace('$', '').replace(' ', '').replace(',', '')
@@ -14,8 +13,6 @@ def _float_from_dollar_string(input):
         return 0
     else:
         return float(ret)
-
-
 
 def read_in_pnc_transactions(filepath: str):
     # Read in the PNC data from csv
@@ -87,16 +84,71 @@ def read_in_barclay_transactions(filepath: str):
         if new is not None:
             barclay_transactions.append(new)
 
-        # barclay_transactions.append(create_standard_transaction(**{
-        #     "datestamp": transaction['Transaction Date'],
-        #     "source": "BarclayCardUs",
-        #     "debit": debit,
-        #     "credit": credit,
-        #     "description": transaction['Description'],
-        #     "category": transaction_category
-        # }))
-
     return barclay_transactions
 
+def read_in_old_ledgers(filepath: str, account: Account):
+    # Read in the old ledger data from csv
+    old_data = pd.read_csv(filepath).fillna("")
 
+    # Transalate old ledger data into standard ledger format
+    old_ledgers = []
+    for ledger in old_data.to_dict('rows'):
+        if ledger['Trans_Type'] == 'APPLY PMNT':
+            debit = _float_from_dollar_string(ledger['Amount'])
+            credit = 0.0
+            transaction_category = TransactionTypes.RECORD_EXPENSE
+        elif ledger['Trans_Type'] == 'MOVING FUNDS':
+            debit = _float_from_dollar_string(ledger['Amount'])
+            credit = _float_from_dollar_string(ledger['Amount'])
+            transaction_category = TransactionTypes.MOVE_FUNDS
+        elif ledger['Trans_Type'] == 'ADD INCOME':
+            debit = 0.0
+            credit = _float_from_dollar_string(ledger['Amount'])
+            transaction_category = TransactionTypes.APPLY_INCOME
+        elif ledger['Trans_Type'] == 'BALANCE BANK':
+            debit = 0.0
+            credit = _float_from_dollar_string(ledger['Amount'])
+            transaction_category = TransactionTypes.BALANCE_BANK
+        elif ledger['Trans_Type'] == "CHANGE MONTH":
+            continue
+        else:
+            raise Exception(f"Unhandled transaction category for BarclaycardUS: {ledger['Trans_Type']}")
+
+        from_bucket = ledger['From']
+        to_account = ledger['To']
+        spend_category = ledger['Spend_Cat']
+        trans_id = str(uuid.uuid4())
+
+        # Add transaction fro reference
+        transaction = dsvct.enter_if_not_exists(transaction_category=ledger['Trans_Type']
+                                              , transaction_id=trans_id
+                                              , description=ledger['Comment']
+                                              , debit=debit
+                                              , credit=credit
+                                              , source=TransactionSource.ARCHIVE.name
+                                              , date_stamp=parser.parse(ledger['Date'])
+                                              , handled=TransactionStatus.HANDLED.name)
+
+
+        # Unsure about format, but confident no duplicates, therefore dont check for dups before entering
+        new = dsvcl.enter_ledger_entry(
+                                    transaction_id=trans_id
+                                    , transaction_category=transaction_category.name
+                                    , description=ledger['Comment']
+                                    , debit=debit
+                                    , credit=credit
+                                    , source=TransactionSource.ARCHIVE.name
+                                    , from_account=account.account_name
+                                    , from_bucket=from_bucket
+                                    , to_bucket=to_account
+                                    , to_account=to_account
+                                    , spend_category=spend_category
+                                    , date_stamp=parser.parse(ledger['Date'])
+                                    , notes=ledger['Comment'])
+
+
+        if new is not None:
+            old_ledgers.append(new)
+
+    return old_ledgers
 

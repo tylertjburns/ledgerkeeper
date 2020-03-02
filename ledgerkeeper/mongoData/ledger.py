@@ -15,10 +15,11 @@ class LedgerItem(mongoengine.Document):
     from_bucket = mongoengine.StringField(required=True)
     to_account = mongoengine.StringField(required=True)
     to_bucket = mongoengine.StringField(required=True)
-
+    spend_category = mongoengine.StringField(required=True)
     amount_covered = mongoengine.FloatField(default=0)
     refunded = mongoengine.FloatField(default=0)
     notes = mongoengine.StringField(default="")
+    source = mongoengine.StringField(default="")
 
     # Embedded Documents
 
