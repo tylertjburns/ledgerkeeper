@@ -1,25 +1,60 @@
 import mongoData.ledger_data_service as dsvcl
-import json
 import pandas as pd
-import matplotlib as plt
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import datetime
+from dateutil.relativedelta import relativedelta
 
-def plot_history_by_category():
-    items_json = dsvcl.query_ledger("").to_json()
-    print(items_json)
-    data = pd.io.json.json_normalize(json.loads(items_json))
+# print(plt.style.available)
+mpl.style.use(['ggplot'])  # optional: for ggplot-like style
 
-    for column in data.columns:
-        print (column)
-    data['date_stamp.$date'] = pd.to_datetime(data['date_stamp.$date'], format='%m/%d/%y %I:%M%p')
-    with pd.option_context('display.max_rows', None, 'display.max_columns', 2000, 'display.width', 250):
-        print(data)
+from enums import TransactionTypes
 
 
-    grouped_data = data.groupby(pd.Grouper(freq='M')).sum()
+def _print_df(df: pd.DataFrame):
+    with pd.option_context('display.max_rows', 100, 'display.max_columns', 2000, 'display.width', 250):
+        print(df)
 
-    with pd.option_context('display.max_rows', None, 'display.max_columns', 2000, 'display.width', 250):
-        print(grouped_data)
-    plt.plot(grouped_data)
+def plot_history_by_category(recent_months:int, print_data=False):
+
+    ledger_items = dsvcl.query_ledger("", True)
+    data = pd.DataFrame(ledger_items)
+    spent = data[(data['transaction_category'] == TransactionTypes.RECORD_EXPENSE.name)
+                & (data['spend_category'] != "_NA")
+                & (data['date_stamp'] >= datetime.datetime.now() - relativedelta(months=+recent_months))]
+    spent.index = spent['date_stamp']
+
+    if print_data:
+        _print_df(spent)
+
+
+    grouped_spent = spent.groupby([pd.Grouper(freq='M'), pd.Grouper('spend_category')]).sum()
+
+    if print_data:
+        _print_df(grouped_spent)
+
+    pivot = pd.pivot_table(grouped_spent, values=['debit'], index=['date_stamp'], columns=['spend_category']).fillna(0)
+
+    if print_data:
+        _print_df(pivot)
+
+    income = data[(data['transaction_category'] == TransactionTypes.APPLY_INCOME.name)
+                & (data['date_stamp'] >= datetime.datetime.now() - relativedelta(months=+recent_months))]\
+                [['date_stamp', 'credit']]
+    income.index = income['date_stamp']
+    grouped_income = income.groupby([pd.Grouper(freq='M')]).sum()
+
+    if print_data:
+        _print_df(grouped_income)
+
+    ax = plt.subplot()
+    pivot.plot(kind="area", alpha=.15, figsize=(15, 10), ax=ax)
+    grouped_income.plot(kind="line", alpha=.85, ax=ax, color=['yellow'])
+
+    plt.title("Spend History by Category")
+    plt.xlabel("Month")
+    plt.ylabel("Amount")
+    plt.show()
 
 
 # def plot_datetime(df, title="Yelp Businesses Checkins",
@@ -67,4 +102,4 @@ if __name__ == "__main__":
     import mongo_setup
     mongo_setup.global_init()
 
-    plot_history_by_category()
+    plot_history_by_category(10, True)

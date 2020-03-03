@@ -112,11 +112,21 @@ def find_ledger_by_date_debit_credit(date: datetime.date, debit: float = 0, cred
 def clear_ledger():
     LedgerItem.drop_collection()
 
-def query_ledger(query) -> List[LedgerItem]:
+def query_ledger(query, raw_return=True):
     if query == "":
-        return LedgerItem.objects().order_by('date_stamp')
+        ledgers = LedgerItem.objects()
     else:
-        return LedgerItem.obects(__raw__=query).order_by('date_stamp')
+        ledgers = LedgerItem.obects(__raw__=query)
+
+    if raw_return:
+        return ledgers.as_pymongo()
+    else:
+        ret_ledgers = []
+        for l in ledgers.order_by('date_stamp'):
+            ret_ledgers.append(l)
+
+        return ret_ledgers
+
 
 def delete_by_id(id: str):
     success = LedgerItem.objects(id=id).delete()

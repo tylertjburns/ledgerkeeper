@@ -88,7 +88,9 @@ def read_in_barclay_transactions(filepath: str):
 
 def read_in_old_ledgers(filepath: str, account: Account):
     # Read in the old ledger data from csv
-    old_data = pd.read_csv(filepath).fillna("")
+    old_data = pd.read_csv(filepath, encoding='ISO-8859-1').fillna("")
+
+
 
     # Transalate old ledger data into standard ledger format
     old_ledgers = []
@@ -112,7 +114,7 @@ def read_in_old_ledgers(filepath: str, account: Account):
         elif ledger['Trans_Type'] == "CHANGE MONTH":
             continue
         else:
-            raise Exception(f"Unhandled transaction category for BarclaycardUS: {ledger['Trans_Type']}")
+            raise Exception(f"Unhandled transaction category for Archive: {ledger['Trans_Type']}")
 
         from_bucket = ledger['From']
         to_account = ledger['To']

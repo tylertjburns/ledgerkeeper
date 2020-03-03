@@ -16,6 +16,9 @@ def _notify_user(text: str):
     time.sleep(1)
 
 
+def _request_string(prompt: str):
+    return input(prompt)
+
 def _request_float(prompt: str):
     while True:
         try:
@@ -31,7 +34,6 @@ def _request_guid(prompt: str):
             return inp
         else:
             _notify_user("Invalid Guid...")
-            pd.Dat
 
 def _request_int(prompt: str):
     while True:
@@ -132,5 +134,5 @@ def _pretty_print_items(items, title=None):
     print(f"{title}# of items {len(data)}")
 
     if len(data) > 0:
-        with pd.option_context('display.max_rows', None, 'display.max_columns', 2000, 'display.width', 250):
+        with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
             print(data)
