@@ -11,11 +11,12 @@ from typing import Dict
 import tkinter
 import tkinter.filedialog as fd
 
+GOBACK = "X"
 
 class CliInteractionManager(UserIteractionManager):
-    def notify_user(self, text: str):
+    def notify_user(self, text: str, delay_sec=1):
         print(text)
-        time.sleep(1)
+        time.sleep(delay_sec)
 
     def request_string(self, prompt: str):
         return input(prompt)
@@ -34,13 +35,20 @@ class CliInteractionManager(UserIteractionManager):
         except:
             return False
 
-    def request_enum(self, enum):
+    def request_enum(self, enum, prompt:str = None):
+        if prompt is not None:
+            print(prompt)
+
         while True:
             if issubclass(enum, Enum):
                 print(f"Enter {enum.__name__}:")
                 for i in enum:
                     print(f"{i.value} -- {i.name}")
+                print(f"{GOBACK} -- Go Back")
                 inp = input("")
+
+                if inp.upper() == GOBACK:
+                    return None
 
                 enum_num = self._int_tryParse(inp)
                 if enum_num and enum.has_value(enum_num):
@@ -54,12 +62,16 @@ class CliInteractionManager(UserIteractionManager):
                 raise TypeError(f"Input must be of type Enum but {type(enum)} was provided")
 
 
-    def request_float(self, prompt: str):
+    def request_float(self, prompt: str, forcePos:bool = False):
         while True:
             try:
-                return float(input(prompt))
-            except:
-                self.notify_user("invalid float format")
+                inp = float(input(prompt))
+                if forcePos and inp < 0:
+                    raise Exception("Must be a positive number")
+
+                return inp
+            except Exception as e:
+                self.notify_user(f"invalid float entry: {e}")
 
     def request_guid(self, prompt: str):
         while True:
@@ -94,9 +106,14 @@ class CliInteractionManager(UserIteractionManager):
         print(prompt)
         for key in selectionDict:
             print(f"{key} -- {selectionDict[key]}")
+        print(f"{GOBACK} -- Go Back")
+        inp = input("")
+
+        if inp.upper() == GOBACK:
+            return None
 
         while True:
-            inp = self._int_tryParse(input(""))
+            inp = self._int_tryParse(inp)
 
             if inp and selectionDict.get(inp, None) is not None:
                 return selectionDict[inp]
@@ -135,21 +152,22 @@ class CliInteractionManager(UserIteractionManager):
             with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
                 print(data)
 
-    def request_transaction_action(self):
-        print("What do you want to do with this transaction?")
-
-        print("[A]pprove")
-        print("[D]eny")
-        print("[S]plit")
-        print("Mark D[U]plicate")
-        print("[B]ack to main menu")
-        print("")
-        return self.request_string("").upper()
-
-    def plot_request_action(self):
-        print("What do you want to plot?")
-
-        print("[H]istory by Category")
-        print("[B]ack to main menu")
-        print("")
-        return input("").upper()
+    # def request_transaction_action(self):
+    #     print("What do you want to do with this transaction?")
+    #
+    #     print("[A]pprove")
+    #     print("[D]eny")
+    #     print("[S]plit")
+    #     print("Mark D[U]plicate")
+    #     print("[B]ack to main menu")
+    #     print("")
+    #     return self.request_string("").upper()
+    #
+    # def plot_request_action(self):
+    #     print("What do you want to plot?")
+    #
+    #     print("[H]istory by Category")
+    #     print("P[R]ojected Finance")
+    #     print("[B]ack to main menu")
+    #     print("")
+    #     return input("").upper()

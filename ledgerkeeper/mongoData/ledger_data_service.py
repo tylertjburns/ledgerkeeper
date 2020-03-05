@@ -2,7 +2,8 @@ from mongoData.ledger import LedgerItem
 from mongoengine.queryset.visitor import Q
 import datetime
 from typing import List
-
+from enums import TransactionTypes
+import pandas as pd
 
 def enter_if_not_exists(
     transaction_id: str,
@@ -132,6 +133,22 @@ def delete_by_id(id: str):
     success = LedgerItem.objects(id=id).delete()
     return success
 
+def expense_history(start_date, end_date):
+    data = pd.DataFrame(query_ledger(""))
+    spent = data[(data['transaction_category'] == TransactionTypes.RECORD_EXPENSE.name)
+                & (data['date_stamp'] >= pd.Timestamp(start_date))
+                & (data['date_stamp'] < pd.Timestamp(end_date))][['date_stamp', 'debit', 'amount_covered', 'refunded', 'spend_category']]
+    spent.index = spent['date_stamp']
+    return spent
+
+def income_history(start_date, end_date):
+    data = pd.DataFrame(query_ledger(""))
+    inc = data[(data['transaction_category'] == TransactionTypes.APPLY_INCOME.name)
+                & (data['date_stamp'] >= pd.Timestamp(start_date))
+                & (data['date_stamp'] < pd.Timestamp(end_date))][['date_stamp', 'credit']]
+    inc.index = inc['date_stamp']
+    return inc
+
 if __name__ == "__main__":
 
     import mongo_setup
@@ -158,5 +175,10 @@ if __name__ == "__main__":
     # ret = find_ledger_by_description_date_debit(description, date_stamp, debit)
     # print(ret)
     
-    ret = ledger_by_account("aa1")
+    # ret = ledger_by_account("aa1")
+    ret = income_history(datetime.datetime.now() - datetime.timedelta(days=30), datetime.datetime.now())
+
+    print(ret)
+
+
     print (f"#: {len(ret)} \n{ret.to_json()}")

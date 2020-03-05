@@ -11,11 +11,11 @@ class TransactionTypes(Enum):
 
     @classmethod
     def has_name(cls, name):
-        return name in TransactionTypes._member_names_
+        return name in cls._member_names_
 
     @classmethod
     def has_value(cls, value):
-        return value in set([item.value for item in TransactionTypes])
+        return value in set([item.value for item in cls])
 
 class TransactionSource(Enum):
     PNC = 1
@@ -24,11 +24,11 @@ class TransactionSource(Enum):
 
     @classmethod
     def has_name(cls, name):
-        return name in TransactionSource._member_names_
+        return name in cls._member_names_
 
     @classmethod
     def has_value(cls, value):
-        return value in set(item.value for item in TransactionSource)
+        return value in set(item.value for item in cls)
 
 class TransactionStatus(Enum):
     UNHANDLED = 1
@@ -39,11 +39,11 @@ class TransactionStatus(Enum):
 
     @classmethod
     def has_name(cls, name):
-        return name in CollectionType._member_names_
+        return name in cls._member_names_
 
     @classmethod
     def has_value(cls, value):
-        return value in set([item.value for item in CollectionType])
+        return value in set([item.value for item in cls])
 
 class CollectionType(Enum):
     LEDGER = 1
@@ -53,11 +53,11 @@ class CollectionType(Enum):
 
     @classmethod
     def has_name(cls, name):
-        return name in CollectionType._member_names_
+        return name in cls._member_names_
 
     @classmethod
     def has_value(cls, value):
-        return value in set([item.value for item in CollectionType])
+        return value in set([item.value for item in cls])
 
 class TransactionSplitType(Enum):
     PERCENTAGE = 1
@@ -65,11 +65,11 @@ class TransactionSplitType(Enum):
 
     @classmethod
     def has_name(cls, name):
-        return name in TransactionSplitType._member_names_
+        return name in cls._member_names_
 
     @classmethod
     def has_value(cls, value):
-        return value in set([item.value for item in TransactionSplitType])
+        return value in set([item.value for item in cls])
 
 class AccountType(Enum):
     PERSONAL = 1
@@ -77,11 +77,11 @@ class AccountType(Enum):
 
     @classmethod
     def has_name(cls, name):
-        return name in AccountType._member_names_
+        return name in cls._member_names_
 
     @classmethod
     def has_value(cls, value):
-        return value in set([item.value for item in AccountType])
+        return value in set([item.value for item in cls])
 
 class SpendCategory(Enum):
     INVESTMENT = 1
@@ -105,15 +105,41 @@ class SpendCategory(Enum):
     VACATION = 19
     GENERALHOMEEXPENSE = 20
     MEDICAL = 21
+    NA = 22
 
     @classmethod
     def has_name(cls, name):
-        return name in AccountType._member_names_
+        return name in cls._member_names_
 
     @classmethod
     def has_value(cls, value):
-        return value in set([item.value for item in AccountType])
+        return value in set([item.value for item in cls])
 
+class HandleTransactionMethod(Enum):
+    SPLIT = 1
+    APPROVE = 2
+    DENY = 3
+    DUPLICATE = 4
+
+    @classmethod
+    def has_name(cls, name):
+        return name in cls._member_names_
+
+    @classmethod
+    def has_value(cls, value):
+        return value in set([item.value for item in cls])
+
+class PlotType(Enum):
+    HISTORY_BY_CATEGORY = 1
+    PROJECTED_FINANCE = 2
+
+    @classmethod
+    def has_name(cls, name):
+        return name in cls._member_names_
+
+    @classmethod
+    def has_value(cls, value):
+        return value in set([item.value for item in cls])
 
 if __name__ == "__main__":
     enum = TransactionSource

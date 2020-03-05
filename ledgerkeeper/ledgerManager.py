@@ -1,5 +1,5 @@
 
-from enums import TransactionSource, TransactionTypes, CollectionType, TransactionStatus, TransactionSplitType, AccountType, SpendCategory
+from enums import HandleTransactionMethod, TransactionTypes, CollectionType, TransactionStatus, TransactionSplitType, SpendCategory, PlotType
 from mongoData.transaction import Transaction
 import mongoData.transaction_data_service as dsvct
 import mongoData.account_data_service as dsvca
@@ -7,25 +7,11 @@ import mongoData.ledger_data_service as dsvcl
 from abstracts.userInteractionManager import UserIteractionManager
 import uuid
 
-from plotter import plot_history_by_category
-
-RELEVANTMONTHS = 10
+import plotter as plt
 
 class LedgerManager():
     def __init__(self, user_notification_system: UserIteractionManager):
         self.uns = user_notification_system
-
-    def add_new_account(self):
-        type = self.uns.request_enum(AccountType)
-        name = self.uns.request_string("Account Name:")
-        description = self.uns.request_string("Description:")
-
-        account = dsvca.enter_if_not_exists(name=name, type=type, description=description)
-
-        if account is not None:
-            self.uns.notify_user("Account created successfully!")
-        else:
-            self.uns.notify_user(f"Error creating account. An account with the name {name} already exists.")
 
     def add_ledger(self):
         transaction_id = self.uns.request_string("Transaction Id:")
@@ -63,25 +49,13 @@ class LedgerManager():
         query = self.uns.request_string("Query:")
         dsvcl.query_ledger(query)
 
-    def print_collection(self):
-        print_type = self.uns.request_enum(CollectionType)
+    def print_ledger(self):
+        items_json = dsvcl.query_ledger("").to_json()
+        self.uns.pretty_print_items(items_json, title=CollectionType.LEDGER.name)
 
-        if CollectionType[print_type] == CollectionType.LEDGER:
-            items_json = dsvcl.query_ledger("").to_json()
-            self.uns.pretty_print_items(items_json, title=CollectionType.LEDGER.name)
-        elif CollectionType[print_type] == CollectionType.TRANSACTIONS:
-            items_json = dsvct.query("").to_json()
-            self.uns.pretty_print_items(items_json, title=CollectionType.TRANSACTIONS.name)
-        elif CollectionType[print_type] == CollectionType.BUCKETS:
-            account = self.uns.request_from_dict(dsvca.accounts_as_dict())
-            self.uns.pretty_print_items(dsvca.buckets_by_account(dsvca.account_by_name(account)),
-                                title=CollectionType.BUCKETS.name)
-        elif CollectionType[print_type] == CollectionType.ACCOUNTS:
-            self.uns.pretty_print_items(dsvca.query_account("").to_json(), title=CollectionType.ACCOUNTS.name)
-        else:
-            raise NotImplementedError(f"No print type setup for {print_type}")
-
-        print("")
+    def print_transactions(self):
+        items_json = dsvct.query("").to_json()
+        self.uns.pretty_print_items(items_json, title=CollectionType.TRANSACTIONS.name)
 
     def clear_collection(self):
         collection = self.uns.request_enum(CollectionType)
@@ -107,11 +81,10 @@ class LedgerManager():
 
     def process_transaction_switch(self, input: str):
         switcher = {
-            "A": self.approve_transaction,
-            "D": self.deny_transaction,
-            "U": self.mark_transaction_duplicate,
-            "S": self.split_transaction,
-            "B": "return"
+            HandleTransactionMethod.APPROVE.value: self.approve_transaction,
+            HandleTransactionMethod.DENY.value: self.deny_transaction,
+            HandleTransactionMethod.DUPLICATE.value: self.mark_transaction_duplicate,
+            HandleTransactionMethod.SPLIT.value: self.split_transaction,
         }
         return switcher.get(input, None)
 
@@ -129,44 +102,31 @@ class LedgerManager():
 
         while True:
             # Request direction from user
-            action = self.process_transaction_switch(self.uns.request_transaction_action())
+            direction = self.uns.request_enum(HandleTransactionMethod, "What do you want to do with this transaction?")
+            if direction is None:
+                break
+
+            action = self.process_transaction_switch(direction)
 
             # Process input
             if action is None:
                 # Invalid entry
                 self.uns.notify_user("Invalid Entry...")
-            elif action == 'return':
-                # Return early if the user wants
-                return False
             else:
                 # Process valid action on transaction
                 action(transaction)
                 return True
 
+    def plot_history_by_category(self):
+        nMo = self.uns.request_int("Number of Relevant Months:")
+        plt.plot_history_by_category(nMo)
 
-    def plot_switch(self, input: str):
-        switcher = {
-            "H": plot_history_by_category,
-            "B": "return"
-        }
-        return switcher.get(input, None)
+    def plot_projected_finance(self):
+        hist = self.uns.request_int("Relevant Historical Months:")
+        future = self.uns.request_int("# Months to project:")
+        current = self.uns.request_float("Current Balance:")
 
-    def plot_request_loop(self):
-        while True:
-            # Request direction from user
-            action = self.plot_switch(self.uns.plot_request_action())
-
-            # Process input
-            if action is None:
-                # Invalid entry
-                self.uns.notify_user("Invalid Entry...")
-            elif action == 'return':
-                # Return early if the user wants
-                return False
-            else:
-                # Process valid action on transaction
-                action(RELEVANTMONTHS)
-                return True
+        plt.plot_projected_finance(hist, future, current)
 
     def process_transactions_loop(self):
         # Enter loop for processing transactions
@@ -282,19 +242,3 @@ class LedgerManager():
             self.uns.notify_user("Ledger Entry added successfully")
             dsvct.mark_transaction_handled(transaction)
 
-    def add_bucket_to_account(self):
-        account = self.uns.request_from_dict(dsvca.accounts_as_dict(), prompt="Select an account:")
-        name = self.uns.request_string("Name:")
-        prio = self.uns.request_int("Priority:")
-        due_day = self.uns.request_int("Due day of month:")
-        category = self.uns.request_enum(SpendCategory)
-        base_budget_amount = self.uns.request_float("Base budget amount:")
-
-        bucket = dsvca.add_bucket_to_account(dsvca.account_by_name(account_name=account)
-                                             , name=name
-                                             , priority=prio
-                                             , due_day_of_month=due_day
-                                             , spend_category=category
-                                             , base_budget_amount=base_budget_amount
-                                             )
-        self.uns.notify_user(f"Bucket {bucket.name} added to {account} successfully.")

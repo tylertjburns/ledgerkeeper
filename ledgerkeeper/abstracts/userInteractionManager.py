@@ -42,11 +42,3 @@ class UserIteractionManager(ABC):
     @abstractmethod
     def pretty_print_items(self, items, title=None):
         pass
-
-    @abstractmethod
-    def request_transaction_action(self):
-        pass
-
-    @abstractmethod
-    def plot_request_action(self):
-        pass

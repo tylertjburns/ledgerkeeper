@@ -19,10 +19,10 @@ def plot_history_by_category(recent_months:int, print_data=False):
 
     ledger_items = dsvcl.query_ledger("", True)
     data = pd.DataFrame(ledger_items)
-    spent = data[(data['transaction_category'] == TransactionTypes.RECORD_EXPENSE.name)
-                & (data['spend_category'] != "_NA")
-                & (data['date_stamp'] >= datetime.datetime.now() - relativedelta(months=+recent_months))]
-    spent.index = spent['date_stamp']
+    start_date = datetime.datetime.now() - relativedelta(months=+recent_months)
+    spent = dsvcl.expense_history(start_date, end_date=datetime.datetime.today())
+    spent = spent[(spent['spend_category'] != "_NA")]
+
 
     if print_data:
         _print_df(spent)
@@ -56,50 +56,135 @@ def plot_history_by_category(recent_months:int, print_data=False):
     plt.ylabel("Amount")
     plt.show()
 
+def plot_projected_finance(relevant_past_mo: int, relevant_future_months: int, current_balance: float, one_time_transactions = None):
+    from datetime import date, timedelta
 
-# def plot_datetime(df, title="Yelp Businesses Checkins",
-#                   highlight=True,
-#                   weekend=5,
-#                   ylabel="Number of Visits",
-#                   saveloc=None,
-#                   facecolor='green',
-#                   alpha_span=0.2):
-#     """
-#     Draw a plot of a dataframe that has datetime object as its index
-#     df(pandas) = pandas dataframe with datetime as indeces
-#     highlight(bool) = to highlight or not
-#     title(string) = title of plot
-#     saveloc(string) = where to save file
-#     """
-#
-#     # instantiate fig and ax object
-#     fig, axes = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(15, 5))
-#
-#     # draw all columns of dataframe
-#     for v in df.columns.tolist():
-#         axes.plot(df[v], label=v, alpha=.8)
-#
-#     if highlight:
-#         # find weekend indeces
-#         weekend_indices = find_weekend_indices(df.index, weekend=5)
-#         # highlight weekends
-#         highlight_datetimes(weekend_indices, axes, df, facecolor)
-#
-#     # set title and y label
-#     axes.set_title(title, fontsize=12)
-#     axes.set_ylabel(ylabel)
-#     axes.legend()
-#     plt.tight_layout()
-#
-#     # add xaxis gridlines
-#     axes.xaxis.grid(b=True, which='major', color='black', linestyle='--', alpha=1)
-#
-#     # savefig if
-#     if saveloc:
-#         fig.savefig(saveloc)
+    sdate = date.today() - relativedelta(months=+relevant_past_mo)
+    edate = date.today() + relativedelta(months=+relevant_future_months)
+
+    delta = edate - sdate  # as timedelta
+
+    expenses = dsvcl.expense_history(sdate, edate)
+    grouped_expenses = expenses[(expenses['spend_category'] != "_NA")].groupby(pd.Grouper(freq='D')).sum()
+
+    # _print_df(grouped_expenses)
+    grouped_income = dsvcl.income_history(sdate, edate).groupby(pd.Grouper(freq='D')).sum()
+    _print_df(grouped_income)
+
+    dates = []
+    for i in range(delta.days + 1):
+        day = sdate + timedelta(days=i)
+        dates.append(day)
+
+    dates = pd.DataFrame({'date_stamp': (pd.Timestamp(date) for date in dates)})
+    # _print_df(dates)
+
+    dates_with_history = pd.merge(dates, grouped_expenses, how="left", left_on="date_stamp", right_on="date_stamp")
+    dates_with_history = pd.merge(dates_with_history, grouped_income, how="left",  left_on="date_stamp", right_on="date_stamp")
+    dates_with_history = dates_with_history.fillna(0)
+
+
+    dates_with_history['day'] = dates_with_history.date_stamp.dt.day
+    _print_df(dates_with_history)
+
+    grouped_avg_by_day = dates_with_history.groupby(by=dates_with_history.day).mean()
+    _print_df(grouped_avg_by_day)
+
+    index_of_today = dates_with_history.index[dates_with_history.date_stamp == datetime.datetime.today().strftime('%Y-%m-%d')].tolist()[0]
+
+    # Project Future Transactions
+    if one_time_transactions is None:
+        one_time_transactions = {}
+    last_period_total = current_balance
+    for ii in range(index_of_today, len(dates_with_history)):
+        day_of_month = dates_with_history.iloc[ii]['date_stamp'].day
+        avg_debit = grouped_avg_by_day.iloc[day_of_month - 1]['debit']
+        avg_credit = grouped_avg_by_day.iloc[day_of_month - 1]['credit']
+
+        last_period_total = last_period_total - avg_debit + avg_credit + one_time_transactions.get(dates_with_history.iloc[ii]['date_stamp'], 0)
+        dates_with_history.at[ii, 'EoD'] = last_period_total
+
+    # Enter old transactions
+    next_period_total = current_balance
+    for ii in range(index_of_today, 0, -1):
+        dates_with_history.at[ii, 'EoD'] = next_period_total
+        next_period_total = next_period_total - dates_with_history.iloc[ii]['credit'] + dates_with_history.iloc[ii][
+            'debit']
+
+    #Trendline
+    trend = dates_with_history[dates_with_history.day == 15][['date_stamp', 'EoD']]
+
+
+    dates_with_history['debit'] = -dates_with_history.debit
+    dates_with_history = dates_with_history[['date_stamp', 'debit', 'credit', 'EoD']].fillna(0)
+
+    _print_df(dates_with_history)
+
+    # instantiate fig and ax object
+    fig, axes = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(15, 5))
+
+    ax1 = plot_datetime(dates_with_history, axes, xaxis='date_stamp', ylabel="Amount")
+    ax2 = plot_datetime(trend, axes, xaxis='date_stamp', ylabel='Trend', linestyle='--')
+    show_plot(axes, fig, "Projected Financial Outlook")
+
+
+def show_plot(axes, fig,
+              title="[Title]",
+              saveloc=None):
+    axes.set_title(title, fontsize=14)
+    plt.show()
+
+    # savefig if
+    if saveloc:
+        fig.savefig(saveloc)
+
+def plot_datetime(df,
+                  axes,
+                  xaxis=None,
+                  highlight=True,
+                  weekend=5,
+                  ylabel="Number of Visits",
+                  facecolor='green',
+                  alpha_span=0.2,
+                  linestyle='-'):
+    """
+    Draw a plot of a dataframe
+    df(pandas) = pandas dataframe
+    highlight(bool) = to highlight or not
+    title(string) = title of plot
+    saveloc(string) = where to save file
+    """
+
+    _print_df(df)
+
+    if xaxis is None:
+        df['_tmp_'] = df.index
+        xaxis = '_tmp_'
+
+    # draw all columns of dataframe
+    for v in df.columns.tolist():
+        if v != xaxis:
+            df.plot(x=xaxis, y=v, kind='line', ax=axes, linestyle=linestyle)
+
+    # if highlight:
+    #     # find weekend indeces
+    #     weekend_indices = find_weekend_indices(df.index, weekend=5)
+    #     # highlight weekends
+    #     highlight_datetimes(weekend_indices, axes, df, facecolor)
+
+    # set y label
+    axes.set_ylabel(ylabel)
+    axes.legend()
+    # plt.tight_layout()
+
+    # add xaxis gridlines
+    axes.xaxis.grid(b=True, which='major', color='black', linestyle='--', alpha=1)
+        
+    return axes
 
 if __name__ == "__main__":
     import mongo_setup
     mongo_setup.global_init()
 
-    plot_history_by_category(10, True)
+    # plot_history_by_category(10, True)
+    plot_projected_finance(3, 3, 10000)
