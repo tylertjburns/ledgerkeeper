@@ -1,5 +1,5 @@
-from mongoData.account import Account
-from mongoData.bucket import Bucket
+from ledgerkeeper.mongoData.account import Account
+from ledgerkeeper.mongoData.bucket import Bucket
 from typing import List, Dict
 
 def enter_if_not_exists(name: str,

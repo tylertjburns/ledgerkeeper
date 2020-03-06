@@ -1,4 +1,4 @@
-import mongoData.ledger_data_service as dsvcl
+import ledgerkeeper.mongoData.ledger_data_service as dsvcl
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 # print(plt.style.available)
 mpl.style.use(['ggplot'])  # optional: for ggplot-like style
 
-from enums import TransactionTypes
+from ledgerkeeper.enums import TransactionTypes
 
 
 def _print_df(df: pd.DataFrame):

@@ -45,20 +45,6 @@ class TransactionStatus(Enum):
     def has_value(cls, value):
         return value in set([item.value for item in cls])
 
-class CollectionType(Enum):
-    LEDGER = 1
-    TRANSACTIONS = 2
-    ACCOUNTS = 3
-    BUCKETS = 4
-
-    @classmethod
-    def has_name(cls, name):
-        return name in cls._member_names_
-
-    @classmethod
-    def has_value(cls, value):
-        return value in set([item.value for item in cls])
-
 class TransactionSplitType(Enum):
     PERCENTAGE = 1
     DOLLAR = 2

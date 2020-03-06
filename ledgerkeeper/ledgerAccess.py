@@ -109,7 +109,6 @@ def query_ledger(**query):
         return {"return": ret, "error": error}
 
 if __name__ == "__main__":
-    import loggingConfig
     import mongo_setup as ms
     ms.global_init()
 

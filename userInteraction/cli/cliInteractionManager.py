@@ -1,4 +1,4 @@
-from abstracts.userInteractionManager import UserIteractionManager
+from userInteraction.abstracts.userInteractionManager import UserIteractionManager
 import time
 import pandas as pd
 import json

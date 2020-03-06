@@ -1,5 +1,5 @@
 import mongoengine
-from mongoData.bucket import Bucket
+from ledgerkeeper.mongoData.bucket import Bucket
 
 class Account(mongoengine.Document):
 

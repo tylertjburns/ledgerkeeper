@@ -1,6 +1,8 @@
-import mongoData.account_data_service as dsvca
-from enums import SpendCategory, AccountType, CollectionType
-from abstracts.userInteractionManager import UserIteractionManager
+import ledgerkeeper.mongoData.account_data_service as dsvca
+import ledgerkeeper.mongoData.ledger_data_service as dsvcl
+from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes
+from enums import CollectionType
+from userInteraction.abstracts.userInteractionManager import UserIteractionManager
 
 DEFAULT_BUCKET = "_DEFAULT"
 CREDIT_BUCKET = "_CREDIT"
@@ -31,7 +33,7 @@ class AccountManager():
         
         okay_to_delete = False
         if((waterfall_amt > 0) or (saved_amt > 0)):
-            response = self.uns.request_from_dict({1: "Yes", 2: "No"})
+            response = self.uns.request_from_dict({1: "Yes", 2: "No"}, "Funds in account. Are you sure?")
             if response == "Yes":
                 okay_to_delete = True
         else:
@@ -104,7 +106,26 @@ class AccountManager():
         accountName = self.uns.request_from_dict(dsvca.accounts_as_dict(), "Account:")
         account = dsvca.account_by_name(accountName)
         amount = self.uns.request_float("Amount to add:", forcePos=True)
+        description = self.uns.request_string("Description: ")
+        date = self.uns.request_date()
+        notes = self.uns.request_string("Notes: ")
         buckets = dsvca.buckets_by_account(account)
+
+        ''' Record funds into default account'''
+        dsvcl.enter_ledger_entry("NA",
+                                 description=description,
+                                 transaction_category=TransactionTypes.APPLY_INCOME.name,
+                                 debit=0,
+                                 credit=amount,
+                                 from_account=description,
+                                 from_bucket="income_source",
+                                 to_account=accountName,
+                                 to_bucket=DEFAULT_BUCKET,
+                                 spend_category="NA",
+                                 date_stamp=date,
+                                 notes=notes,
+                                 source="MANUAL_ENTRY")
+
 
         ''' Obtain a sortable list of keys that will be used for iterating through the waterfall'''
         iterSeq = sorted(list(bucket for bucket in buckets), key=lambda x: x.priority)
@@ -123,12 +144,12 @@ class AccountManager():
             if (bucket.name == DEFAULT_BUCKET):
                 keepExcess = True
 
-            excess = self._apply_waterfall_amount_to_bucket(account, bucket, excess, keepExcess=keepExcess)
+            excess = self._apply_waterfall_amount_to_bucket(account, bucket, excess, date, keepExcess=keepExcess)
 
         self.print_buckets(accountName=accountName)
         self.uns.notify_user(f"Amount: {amount} applied successfully")
 
-    def _apply_waterfall_amount_to_bucket(self, account, bucket, amount, keepExcess=False):
+    def _apply_waterfall_amount_to_bucket(self, account, bucket, amount, date, keepExcess=False):
         if (amount < 0):
             raise Exception(f"Error: Amount must be positive, {amount.amount} was entered.")
 
@@ -140,15 +161,44 @@ class AccountManager():
         total_budget = bucket.base_budget_amount + bucket.perc_budget_amount
         if (bucket.waterfall_amount + amount > total_budget and not (keepExcess)):
             excess = bucket.waterfall_amount + amount - total_budget
-            dsvca.update_bucket_waterfall_amount(account, bucket.name, total_budget)
+            applied_amt = total_budget - bucket.waterfall_amount
         else:
-            dsvca.update_bucket_waterfall_amount(account, bucket.name, bucket.waterfall_amount + amount)
+            applied_amt = amount
             excess = 0.0
+
+        dsvca.update_bucket_waterfall_amount(account, bucket.name, bucket.waterfall_amount + applied_amt)
+
+        if (applied_amt != 0) and (bucket.name != DEFAULT_BUCKET):
+            ''' Move funds from default bucket to waterfall bucket'''
+            dsvcl.enter_ledger_entry("NA",
+                                     description="Apply from waterfall",
+                                     transaction_category=TransactionTypes.MOVE_FUNDS.name,
+                                     debit=applied_amt,
+                                     credit=applied_amt,
+                                     from_account=account.account_name,
+                                     from_bucket=DEFAULT_BUCKET,
+                                     to_account=account.account_name,
+                                     to_bucket=bucket.name,
+                                     spend_category="NA",
+                                     date_stamp=date,
+                                     notes="",
+                                     source="WATERFALL_PROCESSING")
 
         self.uns.notify_user(f"{amount - excess} applied to bucket {bucket.name}", delay_sec=0)
         return excess
 
-    def cycle_bucket(self, account, bucket):
+    def cycle_waterfall(self):
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict(), "Account:")
+        account = dsvca.account_by_name(accountName)
+        buckets = dsvca.buckets_by_account(account)
+
+        for bucket in buckets:
+            self._cycle_bucket(account, bucket)
+
+        self.uns.notify_user(f"{accountName} cycled")
+
+
+    def _cycle_bucket(self, account, bucket):
         wf = bucket.waterfall_amount
         dsvca.update_bucket_saved_amount(account, bucket.name, bucket.saved_amount + wf)
         dsvca.update_bucket_waterfall_amount(account, bucket.name, 0)
