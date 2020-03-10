@@ -1,8 +1,9 @@
 from ledgerkeeper.mongoData.ledger import LedgerItem
+from ledgerkeeper.mongoData.account import Account
 from mongoengine.queryset.visitor import Q
 import datetime
 from typing import List
-from ledgerkeeper.enums import TransactionTypes, TransactionSource, SpendCategory
+from ledgerkeeper.enums import TransactionTypes, TransactionSource, SpendCategory, TransactionTypes
 import pandas as pd
 
 def enter_if_not_exists(
@@ -118,10 +119,9 @@ def query_ledger(query, raw_return=True, account_names: List[str] = None):
         ledgers = LedgerItem.objects()
     else:
         query = Q(from_account__in=account_names) | Q(to_account__in=account_names)
-        ledgers = query.to_query(LedgerItem)
+        query = query.to_query(LedgerItem)
+        ledgers = LedgerItem.objects().filter(__raw__=query)
 
-    if query != "":
-        ledgers = ledgers.filter(__raw__=query)
 
     if raw_return:
         return ledgers.as_pymongo()
@@ -137,8 +137,15 @@ def delete_by_id(ledger_id: str):
     success = LedgerItem.objects(id=ledger_id).delete()
     return success
 
-def expense_history(start_date, end_date):
-    data = pd.DataFrame(query_ledger(""))
+def expense_history(start_date, end_date, account: Account = None):
+    if account is None:
+        data = pd.DataFrame(query_ledger(""))
+    else:
+        data = pd.DataFrame(query_ledger("", account_names=[account.account_name]))
+
+    if len(data) == 0:
+        return pd.DataFrame(columns=['date_stamp', 'transaction_category', 'credit', 'amount_covered', 'refunded', 'spend_category'])
+
     spent = data[(data['transaction_category'] == TransactionTypes.RECORD_EXPENSE.name)
                  & (data['date_stamp'] >= pd.Timestamp(start_date))
                  & (data['date_stamp'] < pd.Timestamp(end_date))][['date_stamp', 'debit', 'amount_covered', 'refunded',

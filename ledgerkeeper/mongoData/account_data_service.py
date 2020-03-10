@@ -1,18 +1,18 @@
 from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.mongoData.bucket import Bucket
-from ledgerkeeper.enums import SpendCategory
+from ledgerkeeper.enums import SpendCategory, AccountStatus, AccountType
 from typing import List, Dict
 
-def enter_if_not_exists(name: str,
-    description: str,
-    type: str) -> Account:
+def enter_account_if_not_exists(name: str,
+                                description: str,
+                                type: AccountType) -> Account:
 
     existing = Account.objects(account_name=name)
 
     if len(existing) > 0:
         return None
     else:
-        return enter_transaction(name
+        return enter_account(name
                                   , description
                                   , type
                                  )
@@ -22,15 +22,23 @@ def delete_account(name:str):
 
     account.delete()
 
-def enter_transaction(name: str,
+def enter_account(name: str,
     description: str,
-    type: str
+    type: AccountType
     ) -> Account:
 
     account = Account()
     account.account_name = name
     account.description = description
-    account.type = type
+    account.type = type.name
+    account.status = AccountStatus.ACTIVE.name
+
+    account.save()
+
+    return account
+
+def inactivate_account(account: Account):
+    account.status = AccountStatus.INACTIVE.name
 
     account.save()
 
@@ -46,7 +54,7 @@ def add_bucket_to_account(account: Account,
                           waterfall_amount: float = 0.0,
                           saved_amount: float = 0.0,
                           percent_of_income_adjustment_amount:float = 0.0,
-                            ) -> Bucket:
+                          ) -> Bucket:
     bucket = Bucket()
     bucket.name = name
     bucket.priority = priority
@@ -115,14 +123,26 @@ def update_bucket_percentage_budget_amount(account: Account
 
     return bucket
 
+def update_bucket_priority(account: Account,
+                           bucketName: str,
+                           newPriority: int):
+    bucket = bucket_by_account_and_name(account, bucketName)
+    bucket.priority = newPriority
+    account.save()
+
+    return bucket
+
 
 
 def account_by_name(account_name: str) -> Account:
     return Account.objects(account_name=account_name).first()
 
-def accounts_as_dict() -> Dict[int, str]:
+def accounts_as_dict(statusList:List[str] = None) -> Dict[int, str]:
     accounts = query_account('')
-    return {i + 1: accounts[i].account_name for i in range(0, len(accounts))}
+    if statusList is None:
+        return {i + 1: accounts[i].account_name for i in range(0, len(accounts))}
+    else:
+        return {i + 1: accounts[i].account_name for i in range(0, len(accounts)) if accounts[i].status in statusList}
 
 def query_account(query, accountNames: List[str] = None) -> List[Account]:
 
@@ -136,19 +156,22 @@ def query_account(query, accountNames: List[str] = None) -> List[Account]:
     else:
         return accounts.filter(__raw__=query).order_by('date_stamp')
 
-def buckets_by_account(account:Account) -> List[Bucket]:
+def buckets_by_account(account:Account, raw_return = False) -> List[Bucket]:
 
     buckets = Account.objects(id=account.id).first().buckets
 
-    bucket_list =[
-        bucket for bucket in buckets
-    ]
+    if raw_return:
+        return buckets.as_pymongo()
+    else:
+        bucket_list =[
+            bucket for bucket in buckets
+        ]
 
-    return bucket_list
+        return bucket_list
 
     # return Account.objects(id=account.id).first().buckets.filter()
 
-def buckets_as_dict_by_account(account: Account, exceptedValues = None) -> Dict[int, str]:
+def buckets_as_dict_by_account(account: Account, exceptedValues=None) -> Dict[int, str]:
     if exceptedValues is None:
         exceptedValues = set()
 

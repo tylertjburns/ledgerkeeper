@@ -9,6 +9,10 @@ class MyEnum(Enum):
     def has_value(cls, value):
         return value in set([item.value for item in cls])
 
+    @classmethod
+    def as_list(cls, value):
+        return [e.name for e in cls]
+
 class CollectionType(MyEnum):
     LEDGER = 1
     TRANSACTIONS = 2
@@ -24,3 +28,5 @@ class PlotType(MyEnum):
 
 class ReportType(MyEnum):
     BALANCESHEETOVERTIME = 1
+    FULLWATERFALL = 2
+    WATERFALLSUMMARY = 3

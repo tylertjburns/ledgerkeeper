@@ -12,6 +12,8 @@ class TransactionSource(MyEnum):
     PNC = 1
     BARCLAYCARDUS = 2
     ARCHIVE = 3
+    MANUALENTRY = 4
+    APPLICATION = 5
 
 class TransactionStatus(MyEnum):
     UNHANDLED = 1
@@ -50,13 +52,27 @@ class SpendCategory(MyEnum):
     VACATION = 19
     GENERALHOMEEXPENSE = 20
     MEDICAL = 21
-    NA = 22
+    CABLE_INTERNET = 22
+    TRAVEL = 23
+    NOEXPENSE = 24
+    NA = 25
 
 class HandleTransactionMethod(MyEnum):
     SPLIT = 1
     APPROVE = 2
     DENY = 3
     DUPLICATE = 4
+
+class AccountStatus(MyEnum):
+    ACTIVE = 1
+    INACTIVE = 2
+
+class DefaultBuckets(MyEnum):
+    _DEFAULT = 1
+    _CREDIT = 2
+    _OTHER = 3
+    _TAX_WITHOLDING = 4
+    _PAY_WITH_REIMBURSEMENT = 5
 
 if __name__ == "__main__":
     enum = TransactionSource

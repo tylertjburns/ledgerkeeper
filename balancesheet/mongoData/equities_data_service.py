@@ -95,11 +95,6 @@ def query_values_over_time_by_accounts(query, raw_return=True, accountIds:List[s
 
     return values
 
-    if accountIds is not None:
-        account_query = Q(account_id__in=accountIds).to_query(Equity)
-        equities = equities.filter(__raw__=account_query)
-
-
 
 def equity_by_account_and_name(account_id: str, equity_name: str) -> Equity:
     return Equity.objects()\
@@ -142,6 +137,9 @@ def balance_over_time_data(relevant_months: int, accountIds: List[str] = None):
     else:
         values = query_values_over_time_by_accounts("", True, accountIds)
 
+    if len(values) == 0:
+        return pd.DataFrame(columns=["accountId", "name", "class", "year", "month", "value", "BOM"])
+
     data = pd.DataFrame(values)
 
     start_date = datetime.datetime.now() - relativedelta(months=+relevant_months)
@@ -156,13 +154,17 @@ def balance_over_time_data(relevant_months: int, accountIds: List[str] = None):
 def balance_sheet_over_time(relevant_months: int, accountIds: List[str] = None):
     timed_data = balance_over_time_data(relevant_months=relevant_months, accountIds=accountIds)
 
+    if len(timed_data) == 0:
+        return pd.DataFrame()
+
     pivot = pd.pivot_table(timed_data, values=['value'], index=['accountId', 'class', 'name'], columns=['BOM']).fillna(0)
     pivot.sort_index( axis=1, ascending=False, inplace=True)
     pivot.sort_values(by=['accountId', 'class', 'name'], inplace=True)
 
-    # with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
-    #     print(pivot)
     return pivot
+
+def clear_equities():
+    Equity.drop_collection()
 
 if __name__ == "__main__":
     import mongo_setup

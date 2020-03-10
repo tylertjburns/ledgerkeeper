@@ -1,5 +1,5 @@
 
-from ledgerkeeper.enums import HandleTransactionMethod, TransactionTypes, TransactionStatus, TransactionSplitType, SpendCategory
+from ledgerkeeper.enums import HandleTransactionMethod, TransactionTypes, TransactionStatus, TransactionSplitType, SpendCategory, AccountStatus
 from enums import CollectionType
 from ledgerkeeper.mongoData.transaction import Transaction
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
@@ -51,7 +51,8 @@ class LedgerManager():
         dsvcl.query_ledger(query)
 
     def print_ledger(self):
-        items_json = dsvcl.query_ledger("").to_json()
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), "Account: ")
+        items_json = dsvcl.query_ledger("", account_names=[accountName]).to_json()
         self.uns.pretty_print_items(items_json, title=CollectionType.LEDGER.name)
 
     def print_transactions(self):
@@ -61,9 +62,9 @@ class LedgerManager():
     def clear_collection(self):
         collection = self.uns.request_enum(CollectionType)
 
-        if CollectionType[collection] == CollectionType.LEDGER:
+        if collection == CollectionType.LEDGER:
             dsvcl.clear_ledger()
-        elif CollectionType[collection] == CollectionType.TRANSACTIONS:
+        elif collection == CollectionType.TRANSACTIONS:
             dsvct.clear_collection()
         else:
             raise NotImplementedError(f"Undefined collection for clearing {collection}")
@@ -119,15 +120,19 @@ class LedgerManager():
                 return True
 
     def plot_history_by_category(self):
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), "Account: ")
+        account = dsvca.account_by_name(accountName)
         nMo = self.uns.request_int("Number of Relevant Months:")
-        plt.plot_history_by_category(nMo)
+        plt.plot_history_by_category(nMo, account=account)
 
     def plot_projected_finance(self):
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), "Account: ")
+        account = dsvca.account_by_name(accountName)
         hist = self.uns.request_int("Relevant Historical Months:")
         future = self.uns.request_int("# Months to project:")
         current = self.uns.request_float("Current Balance:")
 
-        plt.plot_projected_finance(hist, future, current)
+        plt.plot_projected_finance(hist, future, current, account=account)
 
     def process_transactions_loop(self):
         # Enter loop for processing transactions
@@ -209,7 +214,7 @@ class LedgerManager():
             to_account = self.uns.request_from_dict(dsvca.accounts_as_dict(), prompt="To Account:")
             to_bucket = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(to_account)),
                                            "To Bucket:")
-            spend_category = "NA"
+            spend_category = SpendCategory.NA
         elif transaction.credit == 0 and transaction.debit > 0:
             from_account = self.uns.request_from_dict(dsvca.accounts_as_dict(), prompt="From Account:")
             from_bucket = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(from_account)),
@@ -232,7 +237,7 @@ class LedgerManager():
                                            , from_bucket=from_bucket
                                            , to_account=to_account
                                            , to_bucket=to_bucket
-                                           , spend_category=spend_category
+                                           , spend_category=SpendCategory[spend_category]
                                            , date_stamp=transaction.date_stamp
                                            , notes=notes
                                            , source=transaction.source)

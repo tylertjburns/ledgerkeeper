@@ -1,4 +1,7 @@
 import ledgerkeeper.mongoData.account_data_service as dsvca
+import ledgerkeeper.mongoData.ledger_data_service as dsvcl
+import ledgerkeeper.mongoData.transaction_data_service as dsvct
+import balancesheet.mongoData.equities_data_service as dsvce
 
 import ledgerkeeper.dataFileTranslation as dft
 from ledgerkeeper.enums import TransactionSource
@@ -24,6 +27,9 @@ def loop(switch, request):
     while True:
         action = switch(request())
         if action == ret:
+            return
+        elif action == exit_app:
+            action()
             return
         elif action is not None:
             action()
@@ -60,9 +66,11 @@ def accounts_sub_menu_switch(input:str):
     switcher = {
         "A": add_new_account,
         "D": delete_account,
+        "E": deactivate_account,
         "I": apply_income,
         "B": add_bucket_to_account,
         "K": delete_bucket,
+        "R": change_bucket_priority,
         'Y': cycle_waterfall,
         "X": ret
     }
@@ -72,10 +80,12 @@ def accounts_sub_menu():
     print('******************* ACCOUNTS **********************')
     print("[A]dd new Account")
     print("[D]elete Account")
+    print("D[E]activate Account")
     print("Apply [I]ncome")
     print("Add [B]ucket to account")
     print("Delete Buc[K]et")
     print("C[Y]cle Waterfall")
+    print("Change P[R]iority")
     print("[X] Back")
 
     return input("").upper()
@@ -104,7 +114,7 @@ def ledger_sub_menu():
     return input("").upper()
 
 def ledger_sub_menu_loop():
-    loop(accounts_sub_menu_switch, accounts_sub_menu)
+    loop(ledger_sub_menu_switch, ledger_sub_menu)
 
 
 def print_sub_menu_switch(input: str):
@@ -186,17 +196,17 @@ def print_collection():
     if print_type is None:
         return
 
-    if CollectionType[print_type] == CollectionType.LEDGER:
+    if print_type == CollectionType.LEDGER:
         ledgerManager.print_ledger()
-    elif CollectionType[print_type] == CollectionType.TRANSACTIONS:
+    elif print_type == CollectionType.TRANSACTIONS:
         ledgerManager.print_transactions()
-    elif CollectionType[print_type] == CollectionType.BUCKETS:
+    elif print_type == CollectionType.BUCKETS:
         accountManager.print_buckets()
-    elif CollectionType[print_type] == CollectionType.ACCOUNTS:
+    elif print_type == CollectionType.ACCOUNTS:
         accountManager.print_accounts()
-    elif CollectionType[print_type] == CollectionType.ENTITIES:
+    elif print_type == CollectionType.ENTITIES:
         equityManager.print_equities()
-    elif CollectionType[print_type] == CollectionType.ENTITY_VALUE_SNAPSHOTS:
+    elif print_type == CollectionType.ENTITY_VALUE_SNAPSHOTS:
         equityManager.print_value_snapshots()
     else:
         raise NotImplementedError(f"No print type setup for {print_type}")
@@ -212,6 +222,8 @@ def print_report():
 
     if print_type == ReportType.BALANCESHEETOVERTIME:
         equityManager.print_balance_sheet()
+    elif print_type == ReportType.WATERFALLSUMMARY:
+        accountManager.print_waterfall_summary()
     else:
         raise NotImplementedError(f"No print type setup for {print_type.name}")
 
@@ -219,6 +231,24 @@ def print_report():
 
 def clear_collection():
     print('******************* CLEAR COLLECTION *****************')
+    collection = userInteraction.request_enum(CollectionType)
+
+    if collection is None:
+        return
+
+    if collection == CollectionType.LEDGER:
+        dsvcl.clear_ledger()
+    elif collection == CollectionType.TRANSACTIONS:
+        dsvct.clear_collection()
+    elif collection == CollectionType.ENTITIES:
+        dsvce.clear_collection()
+    else:
+        userInteraction.notify_user(f"Undefined collection for clearing {collection}")
+        return
+
+    userInteraction.notify_user(f"{collection} collection cleared\n")
+
+
     ledgerManager.clear_collection()
 
 def delete_a_ledger_item():
@@ -228,7 +258,7 @@ def delete_a_ledger_item():
 def exit_app():
     print('******************** EXIT APP ************************')
     ledgerManager.uns.notify_user("Goodbye!")
-    raise KeyboardInterrupt()
+    # raise KeyboardInterrupt()
 
 def process_transactions_loop():
     print('******************** Process Transaction ***************')
@@ -238,17 +268,22 @@ def load_new_transactions():
     print('******************** Load New Transactions *************')
 
     # Ask User for source
-    source = userInteraction.request_enum(TransactionSource)
+    source = userInteraction.request_from_dict({
+        1: TransactionSource.PNC.name,
+        2: TransactionSource.BARCLAYCARDUS.name,
+        3: TransactionSource.ARCHIVE.name
+    }
+    )
 
     # Get Filepath
     in_path = userInteraction.request_filepath()
 
     # React to user input
-    if TransactionSource[source] == TransactionSource.BARCLAYCARDUS:
+    if source == TransactionSource.BARCLAYCARDUS.name:
         transactions = dft.read_in_barclay_transactions(in_path)
-    elif TransactionSource[source] == TransactionSource.PNC:
+    elif source == TransactionSource.PNC.name:
         transactions = dft.read_in_pnc_transactions(in_path)
-    elif TransactionSource[source] == TransactionSource.ARCHIVE:
+    elif source == TransactionSource.ARCHIVE.name:
         account = userInteraction.request_from_dict(dsvca.accounts_as_dict())
         transactions = dft.read_in_old_ledgers(filepath=in_path, account=dsvca.account_by_name(account))
         userInteraction.notify_user("Ledger Items created directly")
@@ -285,6 +320,15 @@ def delete_equity():
 def record_equity_value_snapshot():
     print('******************** RECORD EQUITY VALUE ********************')
     equityManager.record_value()
+
+def deactivate_account():
+    print('******************** DEACTIVATE ACCOUNT ********************')
+    accountManager.inactivate_account()
+
+def change_bucket_priority():
+    print('******************** CHANGE PRIORITY ********************')
+    accountManager.udpate_bucket_priority()
+
 
 if __name__ == "__main__":
     import mongo_setup

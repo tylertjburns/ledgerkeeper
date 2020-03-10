@@ -1,5 +1,5 @@
 import pandas as pd
-from ledgerkeeper.enums import TransactionTypes, TransactionSource, TransactionStatus
+from ledgerkeeper.enums import TransactionTypes, TransactionSource, TransactionStatus, SpendCategory
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
 import uuid
@@ -38,12 +38,12 @@ def read_in_pnc_transactions(filepath: str):
 
 
 
-        new = dsvct.enter_if_not_exists(transaction_category=transaction_category.name
+        new = dsvct.enter_if_not_exists(transaction_category=transaction_category
                                       , transaction_id=str(uuid.uuid4())
                                       , description=transaction['Transaction']
                                       , debit=debit
                                       , credit=credit
-                                      , source=TransactionSource.PNC.name
+                                      , source=TransactionSource.PNC
                                       , date_stamp=parser.parse(transaction['Date']))
 
         if new is not None:
@@ -73,12 +73,12 @@ def read_in_barclay_transactions(filepath: str):
         else:
             raise Exception(f"Unhandled transaction category for BarclaycardUS: {transaction['Category']}")
 
-        new = dsvct.enter_if_not_exists(transaction_category=transaction_category.name
+        new = dsvct.enter_if_not_exists(transaction_category=transaction_category
                                       , transaction_id=str(uuid.uuid4())
                                       , description=transaction['Description']
                                       , debit=debit
                                       , credit=credit
-                                      , source=TransactionSource.BARCLAYCARDUS.name
+                                      , source=TransactionSource.BARCLAYCARDUS
                                       , date_stamp=parser.parse(transaction['Transaction Date']))
 
         if new is not None:
@@ -118,28 +118,35 @@ def read_in_old_ledgers(filepath: str, account: Account):
 
         from_bucket = ledger['From']
         to_account = ledger['To']
-        spend_category = ledger['Spend_Cat']
+
+        if ledger['Spend_Cat'] == 'Car' and ledger['From'] == "Car (AUTO_PNC)":
+            spend_category = SpendCategory.CARPAYMENT
+        elif ledger['Spend_Cat'] == 'Car':
+            spend_category = SpendCategory.CARMAINT
+        else:
+            spend_category = old_spend_category_switch(ledger['Spend_Cat'])
+
         trans_id = str(uuid.uuid4())
 
         # Add transaction fro reference
-        transaction = dsvct.enter_if_not_exists(transaction_category=ledger['Trans_Type']
+        transaction = dsvct.enter_if_not_exists(transaction_category=transaction_category
                                               , transaction_id=trans_id
                                               , description=ledger['Comment']
                                               , debit=debit
                                               , credit=credit
-                                              , source=TransactionSource.ARCHIVE.name
+                                              , source=TransactionSource.ARCHIVE
                                               , date_stamp=parser.parse(ledger['Date'])
-                                              , handled=TransactionStatus.HANDLED.name)
+                                              , handled=TransactionStatus.HANDLED)
 
 
         # Unsure about format, but confident no duplicates, therefore dont check for dups before entering
         new = dsvcl.enter_ledger_entry(
                                     transaction_id=trans_id
-                                    , transaction_category=transaction_category.name
+                                    , transaction_category=transaction_category
                                     , description=ledger['Comment']
                                     , debit=debit
                                     , credit=credit
-                                    , source=TransactionSource.ARCHIVE.name
+                                    , source=TransactionSource.ARCHIVE
                                     , from_account=account.account_name
                                     , from_bucket=from_bucket
                                     , to_bucket=to_account
@@ -154,3 +161,33 @@ def read_in_old_ledgers(filepath: str, account: Account):
 
     return old_ledgers
 
+def old_spend_category_switch(old:str):
+    try:
+        return SpendCategory[old.upper()]
+    except:
+        switcher = {
+            "": SpendCategory.NA,
+            "Income": SpendCategory.NA,
+            "Investment": SpendCategory.INVESTMENT,
+            "_NA": SpendCategory.NOEXPENSE,
+            "Fun": SpendCategory.FUN,
+            "Gas": SpendCategory.FUEL,
+            "Giving": SpendCategory.CHARITY,
+            "Groceries": SpendCategory.GROCERIES,
+            "Home Living": SpendCategory.GENERALHOMEEXPENSE,
+            "Insurance": SpendCategory.CARINSURANCE,
+            "Loan": SpendCategory.LOANPAYMENT,
+            "Medical": SpendCategory.MEDICAL,
+            "Other": SpendCategory.OTHER,
+            "Phone": SpendCategory.PHONE,
+            "Rent / Mortgage": SpendCategory.RENT_MORTGAGE,
+            "Rent/Mortgage": SpendCategory.RENT_MORTGAGE,
+            "Spending Allowance": SpendCategory.SPENDINGALLOWANCE,
+            "Travel": SpendCategory.TRAVEL,
+            "Utilities": SpendCategory.UTILITIES,
+            "Vacation": SpendCategory.VACATION,
+            "Wallace": SpendCategory.PETS,
+            "Work Meals": SpendCategory.GENERALLIVINGEXPENSE,
+            "Work Supplies": SpendCategory.OTHER
+        }
+        return switcher[old]

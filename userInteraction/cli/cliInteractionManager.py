@@ -11,10 +11,13 @@ from typing import Dict
 import tkinter
 import tkinter.filedialog as fd
 
+import mongoHelper
+import pandasHelper
+
 GOBACK = "X"
 
 class CliInteractionManager(UserIteractionManager):
-    def notify_user(self, text: str, delay_sec=1):
+    def notify_user(self, text: str, delay_sec:int =1):
         print(text)
         time.sleep(delay_sec)
 
@@ -24,7 +27,7 @@ class CliInteractionManager(UserIteractionManager):
     def request_int(self, prompt: str):
         while True:
             ret = self._int_tryParse(input(prompt))
-            if ret:
+            if ret is not False:
                 return ret
             else:
                 self.notify_user("Invalid Integer...")
@@ -132,12 +135,7 @@ class CliInteractionManager(UserIteractionManager):
         if type(items) == str:
             data = pd.io.json.json_normalize(json.loads(items))
         elif type(items) is list:
-            jsonstr = "{ \"data\": ["
-            for item in items:
-                jsonstr += item.to_json() + ", "
-            jsonstr = jsonstr[:-2] + "]}"
-            jsonstr = json.loads(jsonstr)
-            data = pd.io.json.json_normalize(jsonstr, record_path='data')
+            data = mongoHelper.list_mongo_to_pandas(items)
         elif type(items) is pd.DataFrame:
             data = items
         else:
@@ -151,5 +149,12 @@ class CliInteractionManager(UserIteractionManager):
         print(f"{title}# of items {len(data)}")
 
         if len(data) > 0:
-            with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
-                print(data)
+            pandasHelper.pretty_print_dataframe(data)
+
+
+if __name__ == "__main__":
+    helper = CliInteractionManager()
+    # suc = helper._int_tryParse('0')
+    suc = helper.request_int("prompt")
+    # self._int_tryParse(input(prompt))
+    print(suc)

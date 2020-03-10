@@ -1,17 +1,17 @@
 from ledgerkeeper.mongoData.transaction import Transaction
-from ledgerkeeper.enums import TransactionStatus
+from ledgerkeeper.enums import TransactionStatus, TransactionTypes, TransactionSource
 import datetime
 from typing import List
 
 
 def enter_if_not_exists(transaction_id: str,
     description: str,
-    transaction_category: str,
+    transaction_category: TransactionTypes,
     debit: float,
     credit: float,
-    source: str,
+    source: TransactionSource,
     date_stamp: datetime.datetime = datetime.datetime.now,
-    handled = TransactionStatus.UNHANDLED.name ) -> Transaction:
+    handled: TransactionStatus = TransactionStatus.UNHANDLED) -> Transaction:
 
     transactions = find_by_description_date_debit_credit(description, date_stamp, debit, credit)
 
@@ -30,22 +30,22 @@ def enter_if_not_exists(transaction_id: str,
 
 def enter_transaction(transaction_id: str,
     description: str,
-    transaction_category: str,
+    transaction_category: TransactionTypes,
     debit: float,
     credit: float,
-    source: str,
+    source: TransactionSource,
     date_stamp: datetime.datetime = datetime.datetime.now,
-    handled = TransactionStatus.UNHANDLED.name) -> Transaction:
+    handled:TransactionStatus = TransactionStatus.UNHANDLED) -> Transaction:
 
     transaction = Transaction()
     transaction.id = transaction_id
-    transaction.category = transaction_category
+    transaction.category = transaction_category.name
     transaction.description = description
     transaction.debit = debit
     transaction.credit = credit
     transaction.date_stamp = date_stamp
-    transaction.source = source
-    transaction.handled = handled
+    transaction.source = source.name
+    transaction.handled = handled.name
 
     transaction.save()
 

@@ -5,7 +5,6 @@ class LedgerItem(mongoengine.Document):
 
     # Top Level Elements
     date_stamp = mongoengine.DateTimeField(default=datetime.datetime.now, format='%m/%d/%Y %H:%M:%S')
-
     transaction_id = mongoengine.StringField(required=True)
     description = mongoengine.StringField(required=True)
     transaction_category = mongoengine.StringField(required=True)

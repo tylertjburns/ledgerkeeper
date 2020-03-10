@@ -1,15 +1,10 @@
 import ledgerkeeper.mongoData.account_data_service as dsvca
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
-from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes
+from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes, AccountStatus, DefaultBuckets, TransactionSource
 from enums import CollectionType
 from userInteraction.abstracts.userInteractionManager import UserIteractionManager
-
-DEFAULT_BUCKET = "_DEFAULT"
-CREDIT_BUCKET = "_CREDIT"
-OTHER_BUCKET = "_OTHER"
-TAX_WITHOLDING_BUCKET = "_TAXWITHOLDINGS"
-PAY_WITH_REIMBURSEMENT_BUCKET = "_PAYWITHREIMBURSEMENT"
-
+import pandas as pd
+import mongoHelper
 
 class AccountManager():
     def __init__(self, user_notification_system: UserIteractionManager):
@@ -22,51 +17,72 @@ class AccountManager():
         if name is None:
             return
 
-        account = dsvca.account_by_name(name)
-        buckets = dsvca.buckets_by_account(account)
-        
-        waterfall_amt = 0
-        saved_amt = 0
-        for bucket in buckets:
-            waterfall_amt += bucket.waterfall_amount
-            saved_amt += bucket.saved_amount
-        
-        okay_to_delete = False
-        if((waterfall_amt > 0) or (saved_amt > 0)):
-            response = self.uns.request_from_dict({1: "Yes", 2: "No"}, "Funds in account. Are you sure?")
-            if response == "Yes":
+        yousure = self.uns.request_from_dict({1: "Yes", 2: "No"}, "Are you sure? This will break all reference to this account!")
+
+        if yousure == "Yes":
+            account = dsvca.account_by_name(name)
+            buckets = dsvca.buckets_by_account(account)
+
+            waterfall_amt = 0
+            saved_amt = 0
+            for bucket in buckets:
+                waterfall_amt += bucket.waterfall_amount
+                saved_amt += bucket.saved_amount
+
+            okay_to_delete = False
+            if((waterfall_amt > 0) or (saved_amt > 0)):
+                response = self.uns.request_from_dict({1: "Yes", 2: "No"}, "Funds in account. Are you sure?")
+                if response == "Yes":
+                    okay_to_delete = True
+            else:
                 okay_to_delete = True
-        else:
-            okay_to_delete = True
-        
-        if okay_to_delete:
-            dsvca.delete_account(name)
-            self.uns.notify_user(f"Account {name} Deleted")
-            
+
+            if okay_to_delete:
+                dsvca.delete_account(name)
+                self.uns.notify_user(f"Account {name} Deleted")
+            else:
+                self.uns.notify_user(f"Deletion Cancelled.")
+
+    def inactivate_account(self):
+        name = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), "Account Name:")
+
+        if name is None:
+            return
+
+        inactive = dsvca.inactivate_account(dsvca.account_by_name(name))
+
+        if inactive is not None:
+            self.uns.notify_user(f"Account {name} Deactivated!")
+
     def add_new_account(self):
         type = self.uns.request_enum(AccountType)
         name = self.uns.request_string("Account Name:")
         description = self.uns.request_string("Description:")
 
-        account = dsvca.enter_if_not_exists(name=name, type=type, description=description)
+        account = dsvca.enter_account_if_not_exists(name=name, type=type, description=description)
 
         if account is not None:
-            dsvca.add_bucket_to_account(account, DEFAULT_BUCKET, 99, 99, SpendCategory.OTHER)
-            dsvca.add_bucket_to_account(account, CREDIT_BUCKET, 99, 99, SpendCategory.NA)
-            dsvca.add_bucket_to_account(account, OTHER_BUCKET, 99, 99, SpendCategory.OTHER)
-            dsvca.add_bucket_to_account(account, TAX_WITHOLDING_BUCKET, 99, 99, SpendCategory.OTHER)
-            dsvca.add_bucket_to_account(account, PAY_WITH_REIMBURSEMENT_BUCKET, 99, 99, SpendCategory.NA)
+            for e in DefaultBuckets:
+                if e in [DefaultBuckets._DEFAULT, DefaultBuckets._OTHER, DefaultBuckets._TAX_WITHOLDING]:
+                    spendCat = SpendCategory.OTHER
+                elif e in [DefaultBuckets._CREDIT, DefaultBuckets._PAY_WITH_REIMBURSEMENT]:
+                    spendCat = SpendCategory.NA
+                else:
+                    raise NotImplementedError("Unhandled default bucket")
+                dsvca.add_bucket_to_account(account, e.name, 99, 99, spendCat)
+
             self.uns.notify_user("Account created successfully!")
         else:
             self.uns.notify_user(f"Error creating account. An account with the name {name} already exists.")
 
     def add_bucket_to_account(self):
-        account = self.uns.request_from_dict(dsvca.accounts_as_dict(), prompt="Select an account:")
+        account = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), prompt="Select an account:")
         name = self.uns.request_string("Bucket Name:")
         prio = self.uns.request_int("Priority:")
         due_day = self.uns.request_int("Due day of month:")
         category = self.uns.request_enum(SpendCategory)
         base_budget_amount = self.uns.request_float("Base budget amount:")
+        percent_of_income_adjustment_amount = self.uns.request_float("Percentage of Income Budget Adjustment [0-100]: ")
 
         bucket = dsvca.add_bucket_to_account(dsvca.account_by_name(account_name=account)
                                              , name=name
@@ -74,6 +90,7 @@ class AccountManager():
                                              , due_day_of_month=due_day
                                              , spend_category=category
                                              , base_budget_amount=base_budget_amount
+                                             , percent_of_income_adjustment_amount=percent_of_income_adjustment_amount
                                              )
         self.uns.notify_user(f"Bucket {bucket.name} added to {account} successfully.")
 
@@ -90,7 +107,7 @@ class AccountManager():
         self.uns.pretty_print_items(dsvca.query_account("").to_json(), title=CollectionType.ACCOUNTS.name)
 
     def move_funds(self):
-        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict(), "Select Account:")
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), "Select Account:")
         account = dsvca.account_by_name(accountName)
         fromB = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(account), "Select from bucket:")
         toB = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(account, set(fromB)), "Select to bucket:")
@@ -103,7 +120,7 @@ class AccountManager():
         dsvca.update_bucket_saved_amount(account, toB, toBucket.saved_amount + amount)
 
     def add_waterfall_funds(self):
-        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict(), "Account:")
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), "Account:")
         account = dsvca.account_by_name(accountName)
         amount = self.uns.request_float("Amount to add:", forcePos=True)
         description = self.uns.request_string("Description: ")
@@ -120,11 +137,11 @@ class AccountManager():
                                  from_account=description,
                                  from_bucket="income_source",
                                  to_account=accountName,
-                                 to_bucket=DEFAULT_BUCKET,
-                                 spend_category="NA",
+                                 to_bucket=DefaultBuckets._DEFAULT.name,
+                                 spend_category=SpendCategory.NA,
                                  date_stamp=date,
                                  notes=notes,
-                                 source="MANUAL_ENTRY")
+                                 source=TransactionSource.MANUALENTRY)
 
 
         ''' Obtain a sortable list of keys that will be used for iterating through the waterfall'''
@@ -135,13 +152,13 @@ class AccountManager():
         keepExcess = False
 
         for bucket in iterSeq:
-            adjustment = round(bucket.percent_of_income_adjustment_amount * amount, 2)
+            adjustment = round(bucket.percent_of_income_adjustment_amount / 100.0 * amount, 2)
             dsvca.update_bucket_percentage_budget_amount(account, bucket.name, bucket.perc_budget_amount + adjustment)
 
             if (excess == 0):
                 break
 
-            if (bucket.name == DEFAULT_BUCKET):
+            if (bucket.name == DefaultBuckets._DEFAULT.name):
                 keepExcess = True
 
             excess = self._apply_waterfall_amount_to_bucket(account, bucket, excess, date, keepExcess=keepExcess)
@@ -168,7 +185,7 @@ class AccountManager():
 
         dsvca.update_bucket_waterfall_amount(account, bucket.name, bucket.waterfall_amount + applied_amt)
 
-        if (applied_amt != 0) and (bucket.name != DEFAULT_BUCKET):
+        if (applied_amt != 0) and (bucket.name != DefaultBuckets._DEFAULT.name):
             ''' Move funds from default bucket to waterfall bucket'''
             dsvcl.enter_ledger_entry("NA",
                                      description="Apply from waterfall",
@@ -176,19 +193,19 @@ class AccountManager():
                                      debit=applied_amt,
                                      credit=applied_amt,
                                      from_account=account.account_name,
-                                     from_bucket=DEFAULT_BUCKET,
+                                     from_bucket=DefaultBuckets._DEFAULT.name,
                                      to_account=account.account_name,
                                      to_bucket=bucket.name,
-                                     spend_category="NA",
+                                     spend_category=SpendCategory.NA,
                                      date_stamp=date,
                                      notes="",
-                                     source="WATERFALL_PROCESSING")
+                                     source=TransactionSource.APPLICATION)
 
         self.uns.notify_user(f"{amount - excess} applied to bucket {bucket.name}", delay_sec=0)
         return excess
 
     def cycle_waterfall(self):
-        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict(), "Account:")
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), "Account:")
         account = dsvca.account_by_name(accountName)
         buckets = dsvca.buckets_by_account(account)
 
@@ -205,11 +222,45 @@ class AccountManager():
         dsvca.update_bucket_percentage_budget_amount(account, bucket.name, 0)
 
     def delete_bucket_from_account(self):
-        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict(), prompt="Select an account:")
-        bucketName = self.uns.request_string("Bucket Name:")
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), prompt="Select an account:")
+        bucketName = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(accountName), ), "Bucket:")
 
         account = dsvca.account_by_name(accountName)
         bucket = dsvca.delete_bucket_from_account(account, bucketName)
 
         self.uns.notify_user(f"Bucket {bucket.name} deleted from {account} successfully.")
 
+    def udpate_bucket_priority(self):
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict([AccountStatus.ACTIVE.name]), prompt="Select an account:")
+        bucketName = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(accountName), ), "Bucket:")
+        account = dsvca.account_by_name(accountName)
+
+        prior = self.uns.request_int("New Priority: ")
+
+        bucket = dsvca.update_bucket_priority(account, bucketName, prior)
+
+        if bucket is not None:
+            self.uns.notify_user(f"{bucketName} priority updated to {prior}")
+
+    def print_waterfall(self):
+        #TODO IMPLEMENT
+        pass
+
+    def print_waterfall_summary(self):
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+        account = dsvca.account_by_name(accountName)
+
+        buckets = dsvca.buckets_by_account(account)
+        data = mongoHelper.list_mongo_to_pandas(buckets)
+
+        import pandasHelper as ph
+        #TODO Massage output
+        ph.pretty_print_dataframe(data)
+        ph.pretty_print_dataframe(data.sum())
+
+
+if __name__ == "__main__":
+
+
+    a = AccountManager()
+    a.print_waterfall_summary()

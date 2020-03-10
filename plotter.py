@@ -1,5 +1,6 @@
 from ledgerkeeper.mongoData.account import Account
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
+from ledgerkeeper.enums import SpendCategory
 import ledgerkeeper.mongoData.account_data_service as dsvca
 import balancesheet.mongoData.equities_data_service as dsvce
 import pandas as pd
@@ -24,12 +25,12 @@ def plot_history_by_category(recent_months:int, print_data=False, account: Accou
     if account is None:
         ledger_items = dsvcl.query_ledger("", True)
     else:
-        ledger_items = dsvcl.query_ledger()
+        ledger_items = dsvcl.query_ledger("")
 
     data = pd.DataFrame(ledger_items)
     start_date = datetime.datetime.now() - relativedelta(months=+recent_months)
-    spent = dsvcl.expense_history(start_date, end_date=datetime.datetime.today())
-    spent = spent[(spent['spend_category'] != "_NA")]
+    spent = dsvcl.expense_history(start_date, end_date=datetime.datetime.today(), )
+    spent = spent[(spent['spend_category'] != SpendCategory.NOEXPENSE.name)]
 
 
     if print_data:
@@ -64,14 +65,15 @@ def plot_history_by_category(recent_months:int, print_data=False, account: Accou
     plt.ylabel("Amount")
     plt.show()
 
-def plot_projected_finance(relevant_past_mo: int, relevant_future_months: int, current_balance: float, one_time_transactions = None):
+def plot_projected_finance(relevant_past_mo: int, relevant_future_months: int, current_balance: float, one_time_transactions = None, account: Account = None):
+
     sdate = date.today() - relativedelta(months=+relevant_past_mo)
     edate = date.today() + relativedelta(months=+relevant_future_months)
 
-    delta = edate - sdate  # as timedelta
+    delta = edate - sdate
 
-    expenses = dsvcl.expense_history(sdate, edate)
-    grouped_expenses = expenses[(expenses['spend_category'] != "_NA")].groupby(pd.Grouper(freq='D')).sum()
+    expenses = dsvcl.expense_history(sdate, edate, account)
+    grouped_expenses = expenses[(expenses['spend_category'] != SpendCategory.NOEXPENSE.name)].groupby(pd.Grouper(freq='D')).sum()
 
     # _print_df(grouped_expenses)
     grouped_income = dsvcl.income_history(sdate, edate).groupby(pd.Grouper(freq='D')).sum()
@@ -92,6 +94,9 @@ def plot_projected_finance(relevant_past_mo: int, relevant_future_months: int, c
 
     dates_with_history['day'] = dates_with_history.date_stamp.dt.day
     _print_df(dates_with_history)
+
+    #TODO: Look throught dates with history and find outliers based on a 'control' of the amount by month.
+    # Then eliminate them prior to calculating means() in step below.
 
     grouped_avg_by_day = dates_with_history.groupby(by=dates_with_history.day).mean()
     _print_df(grouped_avg_by_day)
@@ -147,6 +152,9 @@ def plot_assets_liabilities_worth_over_time(relevant_months: int, print_data=Fal
         with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
             print(balance_over_time_grouped)
 
+    if not 'value' in balance_over_time_grouped.columns:
+        return None
+
     pivot = pd.pivot_table(balance_over_time_grouped, values=['value'], index=['BOM'], columns=['class']).fillna(0)
     pivot.sort_values(by=['BOM'], inplace=True)
     flattened = pd.DataFrame(pivot.to_records())
@@ -164,7 +172,7 @@ def plot_assets_liabilities_worth_over_time(relevant_months: int, print_data=Fal
     ax1 = plot_datetime(flattened, axes, xaxis='BOM', ylabel="ASSET")
     # ax2 = plot_datetime(flattened, axes, xaxis='BOM', ylabel='LIABILITY', linestyle='--')
     show_plot(axes, fig, "Assets, Liabilities, Net Worth over time")
-
+    return axes
 
 def show_plot(axes, fig,
               title="[Title]",
@@ -225,5 +233,5 @@ if __name__ == "__main__":
     mongo_setup.global_init()
 
     # plot_history_by_category(10, True)
-    # plot_projected_finance(3, 3, 10000)
-    plot_assets_liabilities_worth_over_time(relevant_months=5, print_data=True, accountIds=["5e625935df67fa15ba672615"])
+    plot_projected_finance(10, 10, 10000)
+    # plot_assets_liabilities_worth_over_time(relevant_months=5, print_data=True, accountIds=["5e625935df67fa15ba672615"])

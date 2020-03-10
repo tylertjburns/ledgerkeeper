@@ -2,6 +2,7 @@ import balancesheet.mongoData.equities_data_service as dsvce
 from userInteraction.abstracts.userInteractionManager import UserIteractionManager
 import ledgerkeeper.mongoData.account_data_service as dsvca
 from balancesheet.enums import EquityClass, AssetType, LiabiltyType, EquityTimeHorizon, EquityStatus, EquityContingency
+import plotter as plot
 
 class EquityManager():
     def __init__(self, user_notification_system: UserIteractionManager):
@@ -69,6 +70,10 @@ class EquityManager():
 
         equities = dsvce.equities_by_account(account.id)
 
+        if equities is None or len(equities) == 0:
+            self.uns.notify_user(f"No Equities in account [{accountName}]")
+            return
+
         self.uns.pretty_print_items(sorted(equities, key=lambda x: x.equityType),
                                     title="Equities Snapshots")
 
@@ -76,8 +81,8 @@ class EquityManager():
         self.uns.pretty_print_items(dsvce.query_equities("").to_json(), title="Equities")
 
     def print_balance_sheet(self):
-        relevant_mos = self.uns.request_int("Number of past months: ")
         accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+        relevant_mos = self.uns.request_int("Number of past months: ")
         account = dsvca.account_by_name(accountName)
         
         data = dsvce.balance_sheet_over_time(relevant_months=relevant_mos, accountIds=[str(account.id)])
@@ -89,4 +94,13 @@ class EquityManager():
         accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
         account = dsvca.account_by_name(accountName)
 
-        data = dsvce.balance_sheet_over_time(relevant_months=relevant_mos, accountIds=[str(account.id)])
+        ax = plot.plot_assets_liabilities_worth_over_time(relevant_mos, accountIds=[str(account.id)])
+        if ax is None:
+            self.uns.notify_user("No Data to show...")
+        # data = dsvce.balance_sheet_over_time(relevant_months=relevant_mos, accountIds=[str(account.id)])
+
+
+
+
+
+
