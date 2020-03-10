@@ -1,9 +1,14 @@
+from ledgerkeeper.mongoData.account import Account
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
+import ledgerkeeper.mongoData.account_data_service as dsvca
+import balancesheet.mongoData.equities_data_service as dsvce
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import datetime
 from dateutil.relativedelta import relativedelta
+from datetime import date, timedelta
+from typing import List
 
 # print(plt.style.available)
 mpl.style.use(['ggplot'])  # optional: for ggplot-like style
@@ -15,9 +20,12 @@ def _print_df(df: pd.DataFrame):
     with pd.option_context('display.max_rows', 100, 'display.max_columns', 2000, 'display.width', 250):
         print(df)
 
-def plot_history_by_category(recent_months:int, print_data=False):
+def plot_history_by_category(recent_months:int, print_data=False, account: Account = None):
+    if account is None:
+        ledger_items = dsvcl.query_ledger("", True)
+    else:
+        ledger_items = dsvcl.query_ledger()
 
-    ledger_items = dsvcl.query_ledger("", True)
     data = pd.DataFrame(ledger_items)
     start_date = datetime.datetime.now() - relativedelta(months=+recent_months)
     spent = dsvcl.expense_history(start_date, end_date=datetime.datetime.today())
@@ -57,8 +65,6 @@ def plot_history_by_category(recent_months:int, print_data=False):
     plt.show()
 
 def plot_projected_finance(relevant_past_mo: int, relevant_future_months: int, current_balance: float, one_time_transactions = None):
-    from datetime import date, timedelta
-
     sdate = date.today() - relativedelta(months=+relevant_past_mo)
     edate = date.today() + relativedelta(months=+relevant_future_months)
 
@@ -128,6 +134,38 @@ def plot_projected_finance(relevant_past_mo: int, relevant_future_months: int, c
     show_plot(axes, fig, "Projected Financial Outlook")
 
 
+def plot_assets_liabilities_worth_over_time(relevant_months: int, print_data=False, accountIds: List[str] = None):
+    balance_over_time = dsvce.balance_over_time_data(relevant_months, accountIds)
+
+    if print_data:
+        with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
+            print(balance_over_time)
+
+    balance_over_time_grouped = balance_over_time.groupby([pd.Grouper('BOM'), pd.Grouper('class')]).sum()
+
+    if print_data:
+        with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
+            print(balance_over_time_grouped)
+
+    pivot = pd.pivot_table(balance_over_time_grouped, values=['value'], index=['BOM'], columns=['class']).fillna(0)
+    pivot.sort_values(by=['BOM'], inplace=True)
+    flattened = pd.DataFrame(pivot.to_records())
+    flattened.columns = [hdr.replace("('value', \'", "").replace("\')", "") \
+                     for hdr in flattened.columns]
+    flattened['NETWORTH'] = flattened['ASSET'] - flattened['LIABILITY']
+
+    if print_data:
+        with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
+            print(flattened)
+
+    # instantiate fig and ax object
+    fig, axes = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(15, 5))
+
+    ax1 = plot_datetime(flattened, axes, xaxis='BOM', ylabel="ASSET")
+    # ax2 = plot_datetime(flattened, axes, xaxis='BOM', ylabel='LIABILITY', linestyle='--')
+    show_plot(axes, fig, "Assets, Liabilities, Net Worth over time")
+
+
 def show_plot(axes, fig,
               title="[Title]",
               saveloc=None):
@@ -187,4 +225,5 @@ if __name__ == "__main__":
     mongo_setup.global_init()
 
     # plot_history_by_category(10, True)
-    plot_projected_finance(3, 3, 10000)
+    # plot_projected_finance(3, 3, 10000)
+    plot_assets_liabilities_worth_over_time(relevant_months=5, print_data=True, accountIds=["5e625935df67fa15ba672615"])

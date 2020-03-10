@@ -1,8 +1,8 @@
 import ledgerkeeper.mongoData.account_data_service as dsvca
 
 import ledgerkeeper.dataFileTranslation as dft
-from ledgerkeeper.enums import TransactionSource, PlotType
-from enums import CollectionType
+from ledgerkeeper.enums import TransactionSource
+from enums import CollectionType, ReportType, PlotType
 import ledgerkeeper.ledgerManager as lm
 import ledgerkeeper.accountManager as am
 import balancesheet.equityManager as em
@@ -23,7 +23,9 @@ def ret():
 def loop(switch, request):
     while True:
         action = switch(request())
-        if action is not None:
+        if action == ret:
+            return
+        elif action is not None:
             action()
         else:
             userInteraction.notify_user("Invalid Entry...")
@@ -31,9 +33,9 @@ def loop(switch, request):
 def main_menu_switch(input:str):
     switcher = {
         "A": accounts_sub_menu_loop,
-        "E": equity_sub_menu,
+        "E": equity_sub_menu_loop,
         "L": ledger_sub_menu_loop,
-        "P": print_collection,
+        "P": print_sub_menu_loop,
         "C": clear_collection,
         'O': plot_request_loop,
         "X": exit_app
@@ -47,11 +49,10 @@ def main_menu():
     print("[A]ccounts")
     print("[E]quities")
     print("[L]edger")
-    print("[P]rint Collection")
+    print("[P]rint")
     print("[C]lear collection")
     print("Pl[O]t options")
     print("E[X]it")
-
 
     return input("").upper()
 
@@ -100,9 +101,30 @@ def ledger_sub_menu():
     print("[Q]uery ledger")
     print("[X] Back")
 
+    return input("").upper()
+
 def ledger_sub_menu_loop():
     loop(accounts_sub_menu_switch, accounts_sub_menu)
 
+
+def print_sub_menu_switch(input: str):
+    switcher = {
+        "C": print_collection,
+        "R": print_report,
+        "X": ret
+    }
+    return switcher.get(input, None)
+
+def print_sub_menu():
+    print('******************* PRINT **********************')
+    print("[C]ollection")
+    print("[R]eport")
+    print("[X] Back")
+
+    return input("").upper()
+
+def print_sub_menu_loop():
+    loop(print_sub_menu_switch, print_sub_menu)
 
 def equity_sub_menu_switch(input: str):
     switcher = {
@@ -114,48 +136,32 @@ def equity_sub_menu_switch(input: str):
     return switcher.get(input, None)
 
 def equity_sub_menu():
-    print('******************* LEDGER **********************')
+    print('******************* EQUITIES **********************')
     print("[A]dd new equity")
     print("[D]elete equity")
     print("[R]ecord new value snapshot")
     print("[X] Back")
 
+    return input("").upper()
 
 def equity_sub_menu_loop():
     loop(equity_sub_menu_switch, equity_sub_menu)
 
-# def action_switch(input: str):
-#     switcher = {
-#         "A": add_ledger,
-#         "C": clear_collection,
-#         "D": delete_loop,
-#         "I": apply_income,
-#         "K": add_bucket_to_account,
-#         'L': load_new_transactions,
-#         'N': add_new_account,
-#         'O': plot_request_loop,
-#         "P": print_collection,
-#         "Q": query_ledger,
-#         "R": process_transactions_loop,
-#         "X": exit_app,
-#         "Y": cycle_waterfall
-#     }
-#     return switcher.get(input, None)
-
-# def delete_switch(input: str):
-#     switcher = {
-#         "A": delete_account,
-#         "B": delete_bucket,
-#         "L": delete_a_ledger_item,
-#     }
-#     return switcher.get(input, None)
-
-def plot_switch(input: str):
+def plot_switch(input: PlotType):
     switcher = {
-        PlotType.HISTORY_BY_CATEGORY.name: ledgerManager.plot_history_by_category,
-        PlotType.PROJECTED_FINANCE.name: ledgerManager.plot_projected_finance,
+        PlotType.HISTORY_BY_CATEGORY: ledgerManager.plot_history_by_category,
+        PlotType.PROJECTED_FINANCE: ledgerManager.plot_projected_finance,
+        PlotType.ASSET_LIABILITY_NET_OVER_TIME: equityManager.plot_balance_over_time,
+        None: ret
     }
     return switcher.get(input, None)
+
+def plot_sub_menu():
+    print('******************** Plotting ***************************')
+    return userInteraction.request_enum(PlotType, "What do you want to plot?")
+
+def plot_request_loop():
+    loop(plot_switch, plot_sub_menu)
 
 def add_new_account():
     print('******************** NEW ACCOUNT *********************')
@@ -174,7 +180,7 @@ def query_ledger():
     ledgerManager.query_ledger()
 
 def print_collection():
-    print('******************** PRINT ***************************')
+    print('******************** PRINT COLLECTION ***************************')
 
     print_type = userInteraction.request_enum(CollectionType)
     if print_type is None:
@@ -197,6 +203,19 @@ def print_collection():
 
     print("")
 
+def print_report():
+    print('******************** PRINT REPORT ***************************')
+
+    print_type = userInteraction.request_enum(ReportType)
+    if print_type is None:
+        return
+
+    if print_type == ReportType.BALANCESHEETOVERTIME:
+        equityManager.print_balance_sheet()
+    else:
+        raise NotImplementedError(f"No print type setup for {print_type.name}")
+
+    print("")
 
 def clear_collection():
     print('******************* CLEAR COLLECTION *****************')
@@ -210,46 +229,6 @@ def exit_app():
     print('******************** EXIT APP ************************')
     ledgerManager.uns.notify_user("Goodbye!")
     raise KeyboardInterrupt()
-
-def plot_request_loop():
-    print('******************** Plotting ***************************')
-    while True:
-        direction = userInteraction.request_enum(PlotType, "What do you want to plot?")
-
-        if direction is None:
-            return
-
-        action = plot_switch(direction)
-
-        if action is None:
-            userInteraction.notify_user("Invalid Entry...")
-        else:
-            action()
-
-# def delete_loop():
-#     print('******************** Deleting ***************************')
-#
-#     while True:
-#         print("What do you want to delete?")
-#
-#         print("[A]ccount")
-#         print("[B]ucket")
-#         print("[L]edger")
-#         print("E[X]it to menu")
-#         print("")
-#         inp = input("").upper()
-#
-#         if inp == "X":
-#             return
-#
-#         action = delete_switch(inp)
-#         if action is not None:
-#             action()
-#         else:
-#             print("Invalid Selection")
-
-
-
 
 def process_transactions_loop():
     print('******************** Process Transaction ***************')

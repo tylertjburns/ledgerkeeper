@@ -51,11 +51,11 @@ class AccountManager():
         account = dsvca.enter_if_not_exists(name=name, type=type, description=description)
 
         if account is not None:
-            dsvca.add_bucket_to_account(account, DEFAULT_BUCKET, 99, 99, SpendCategory.OTHER.name)
-            dsvca.add_bucket_to_account(account, CREDIT_BUCKET, 99, 99, SpendCategory.NA.name)
-            dsvca.add_bucket_to_account(account, OTHER_BUCKET, 99, 99, SpendCategory.OTHER.name)
-            dsvca.add_bucket_to_account(account, TAX_WITHOLDING_BUCKET, 99, 99, SpendCategory.OTHER.name)
-            dsvca.add_bucket_to_account(account, PAY_WITH_REIMBURSEMENT_BUCKET, 99, 99, SpendCategory.NA.name)
+            dsvca.add_bucket_to_account(account, DEFAULT_BUCKET, 99, 99, SpendCategory.OTHER)
+            dsvca.add_bucket_to_account(account, CREDIT_BUCKET, 99, 99, SpendCategory.NA)
+            dsvca.add_bucket_to_account(account, OTHER_BUCKET, 99, 99, SpendCategory.OTHER)
+            dsvca.add_bucket_to_account(account, TAX_WITHOLDING_BUCKET, 99, 99, SpendCategory.OTHER)
+            dsvca.add_bucket_to_account(account, PAY_WITH_REIMBURSEMENT_BUCKET, 99, 99, SpendCategory.NA)
             self.uns.notify_user("Account created successfully!")
         else:
             self.uns.notify_user(f"Error creating account. An account with the name {name} already exists.")
@@ -114,7 +114,7 @@ class AccountManager():
         ''' Record funds into default account'''
         dsvcl.enter_ledger_entry("NA",
                                  description=description,
-                                 transaction_category=TransactionTypes.APPLY_INCOME.name,
+                                 transaction_category=TransactionTypes.APPLY_INCOME,
                                  debit=0,
                                  credit=amount,
                                  from_account=description,
@@ -172,7 +172,7 @@ class AccountManager():
             ''' Move funds from default bucket to waterfall bucket'''
             dsvcl.enter_ledger_entry("NA",
                                      description="Apply from waterfall",
-                                     transaction_category=TransactionTypes.MOVE_FUNDS.name,
+                                     transaction_category=TransactionTypes.MOVE_FUNDS,
                                      debit=applied_amt,
                                      credit=applied_amt,
                                      from_account=account.account_name,

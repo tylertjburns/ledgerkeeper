@@ -1,18 +1,10 @@
-from enum import Enum
+from enums import MyEnum
 
-class EquityClass(Enum):
+class EquityClass(MyEnum):
     ASSET = 1
     LIABILITY = 2
 
-    @classmethod
-    def has_name(cls, name):
-        return name in cls._member_names_
-
-    @classmethod
-    def has_value(cls, value):
-        return value in set([item.value for item in cls])
-
-class AssetType(Enum):
+class AssetType(MyEnum):
     REAL_ESTATE = 1
     CASH = 2
     ANNUITY = 3
@@ -24,22 +16,22 @@ class AssetType(Enum):
     ISSUED_LOAN = 9
     OTHER = 10
 
-class LiabiltyType(Enum):
+
+class LiabiltyType(MyEnum):
     ACCOUNTS_PAYABLE = 1
     CREDIT = 2
     PERSONAL_LOAN = 3
     STUDENT_LOAN = 4
     MORTGAGE = 5
 
-class EquityTimeHorizon(Enum):
+class EquityTimeHorizon(MyEnum):
     SHORT_TERM = 1
     LONG_TERM = 2
 
-class EquityContingency(Enum):
+class EquityContingency(MyEnum):
     CONTINGENT = 1
     FIXED = 2
 
-class EquityStatus(Enum):
+class EquityStatus(MyEnum):
     OPEN = 1
     CLOSED = 2
-

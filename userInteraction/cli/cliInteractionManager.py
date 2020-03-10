@@ -52,9 +52,9 @@ class CliInteractionManager(UserIteractionManager):
 
                 enum_num = self._int_tryParse(inp)
                 if enum_num and enum.has_value(enum_num):
-                    return enum(enum_num).name
+                    return enum(enum_num)
                 elif not enum_num and enum.has_name(inp):
-                    return inp
+                    return enum[inp]
                 else:
                     print(f"Invalid Entry...")
 
@@ -138,6 +138,8 @@ class CliInteractionManager(UserIteractionManager):
             jsonstr = jsonstr[:-2] + "]}"
             jsonstr = json.loads(jsonstr)
             data = pd.io.json.json_normalize(jsonstr, record_path='data')
+        elif type(items) is pd.DataFrame:
+            data = items
         else:
             raise NotImplementedError(f"Unhandled printable object {type(items)}")
 
@@ -151,23 +153,3 @@ class CliInteractionManager(UserIteractionManager):
         if len(data) > 0:
             with pd.option_context('display.max_rows', 500, 'display.max_columns', 2000, 'display.width', 250):
                 print(data)
-
-    # def request_transaction_action(self):
-    #     print("What do you want to do with this transaction?")
-    #
-    #     print("[A]pprove")
-    #     print("[D]eny")
-    #     print("[S]plit")
-    #     print("Mark D[U]plicate")
-    #     print("[B]ack to main menu")
-    #     print("")
-    #     return self.request_string("").upper()
-    #
-    # def plot_request_action(self):
-    #     print("What do you want to plot?")
-    #
-    #     print("[H]istory by Category")
-    #     print("P[R]ojected Finance")
-    #     print("[B]ack to main menu")
-    #     print("")
-    #     return input("").upper()

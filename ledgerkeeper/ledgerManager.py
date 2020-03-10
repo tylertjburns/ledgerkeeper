@@ -8,7 +8,7 @@ import ledgerkeeper.mongoData.ledger_data_service as dsvcl
 from userInteraction.abstracts.userInteractionManager import UserIteractionManager
 import uuid
 
-import ledgerkeeper.plotter as plt
+import plotter as plt
 
 class LedgerManager():
     def __init__(self, user_notification_system: UserIteractionManager):
@@ -155,10 +155,10 @@ class LedgerManager():
         else:
             raise NotImplementedError("Unable to handle transactions with both credit and debit values")
 
-        if input == TransactionSplitType.PERCENTAGE.name:
+        if input == TransactionSplitType.PERCENTAGE:
             perc = self.uns.request_float("% of current to handle [0-100]:")
             amt = max(min(round(currentAmount * perc / 100, 2), currentAmount), 0)
-        elif input == TransactionSplitType.DOLLAR.name:
+        elif input == TransactionSplitType.DOLLAR:
             amt = max(min(self.uns.request_float(f"Amount to handle [up to {currentAmount}]:"), currentAmount), 0)
         else:
             raise NotImplementedError(f"{input} is not implemented as a TransactionSplitType")
