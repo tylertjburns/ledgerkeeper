@@ -65,11 +65,13 @@ def main_menu():
 def accounts_sub_menu_switch(input:str):
     switcher = {
         "A": add_new_account,
+        "B": add_bucket_to_account,
+        "C": add_open_balance_to_account,
         "D": delete_account,
         "E": deactivate_account,
         "I": apply_income,
-        "B": add_bucket_to_account,
         "K": delete_bucket,
+        "M": remove_open_balance_from_account,
         "R": change_bucket_priority,
         'Y': cycle_waterfall,
         "X": ret
@@ -86,6 +88,8 @@ def accounts_sub_menu():
     print("Delete Buc[K]et")
     print("C[Y]cle Waterfall")
     print("Change P[R]iority")
+    print("Add open balan[C]e to account")
+    print("Re[M]ove open balance from account")
     print("[X] Back")
 
     return input("").upper()
@@ -224,6 +228,10 @@ def print_report():
         equityManager.print_balance_sheet()
     elif print_type == ReportType.WATERFALLSUMMARY:
         accountManager.print_waterfall_summary()
+    elif print_type == ReportType.FULLWATERFALL:
+        accountManager.print_full_waterfall()
+    elif print_type == ReportType.OPENBALANCES:
+        accountManager.print_balances()
     else:
         raise NotImplementedError(f"No print type setup for {print_type.name}")
 
@@ -328,6 +336,14 @@ def deactivate_account():
 def change_bucket_priority():
     print('******************** CHANGE PRIORITY ********************')
     accountManager.udpate_bucket_priority()
+
+def add_open_balance_to_account():
+    print('******************** ADD OPEN BALANCE ********************')
+    accountManager.add_open_balance()
+
+def remove_open_balance_from_account():
+    print('******************** REMOVE OPEN BALANCE ********************')
+    accountManager.delete_open_balance()
 
 
 if __name__ == "__main__":

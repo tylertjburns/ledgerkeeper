@@ -1,5 +1,8 @@
+import datetime
+
 from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.mongoData.bucket import Bucket
+from ledgerkeeper.mongoData.openBalance import OpenBalance
 from ledgerkeeper.enums import SpendCategory, AccountStatus, AccountType
 from typing import List, Dict
 
@@ -191,3 +194,44 @@ def spend_category_by_bucket_name(account:Account, bucket_name) -> str:
 def delete_bucket_from_account(account, bucketName):
     bucket = bucket_by_name(account, bucketName)
     bucket.delete()
+
+def add_open_balance_to_account(account:Account, balanceName: str, balanceValue: float):
+    balance = OpenBalance()
+    balance.name = balanceName
+    balance.amount = balanceValue
+    balance.entry_date = datetime.datetime.now()
+
+    account.openBalances.append(balance)
+
+    account.save()
+    return balance
+
+def balance_by_name_and_account(account:Account, balanceName: str):
+    return OpenBalance.objects() \
+        .filter(name=balanceName) \
+        .filter(account__name=account.name).first()
+
+def delete_open_balance_from_account(account:Account, balanceName: str):
+    balance = balance_by_name_and_account(account, balanceName)
+    balance.delete()
+
+def balances_as_dict_by_account(account: Account, exceptedValues=None):
+    if exceptedValues is None:
+        exceptedValues = set()
+
+    balances = balances_by_account(account)
+    balances = [balance for balance in balances if balance.name not in exceptedValues]
+    return {i + 1: balances[i].name for i in range(0, len(balances))}
+
+def balances_by_account(account:Account, raw_return=False) -> List[OpenBalance]:
+
+    balances = Account.objects(id=account.id).first().openBalances
+
+    if raw_return:
+        return balances.as_pymongo()
+    else:
+        balance_list =[
+            balance for balance in balances
+        ]
+
+        return balance_list

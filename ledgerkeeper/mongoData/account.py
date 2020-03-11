@@ -1,6 +1,8 @@
 import mongoengine
 from ledgerkeeper.mongoData.bucket import Bucket
+from ledgerkeeper.mongoData.openBalance import OpenBalance
 from ledgerkeeper.enums import AccountStatus
+
 
 class Account(mongoengine.Document):
 
@@ -12,6 +14,7 @@ class Account(mongoengine.Document):
 
     # Embedded Documents
     buckets = mongoengine.EmbeddedDocumentListField(Bucket)
+    openBalances = mongoengine.EmbeddedDocumentListField(OpenBalance)
 
     # Meta
     meta = {

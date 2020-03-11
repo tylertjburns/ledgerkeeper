@@ -21,6 +21,7 @@ class CollectionType(MyEnum):
     ENTITIES = 5
     ENTITY_VALUE_SNAPSHOTS = 6
 
+
 class PlotType(MyEnum):
     HISTORY_BY_CATEGORY = 1
     PROJECTED_FINANCE = 2
@@ -30,3 +31,4 @@ class ReportType(MyEnum):
     BALANCESHEETOVERTIME = 1
     FULLWATERFALL = 2
     WATERFALLSUMMARY = 3
+    OPENBALANCES = 4

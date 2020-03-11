@@ -1,10 +1,11 @@
 import ledgerkeeper.mongoData.account_data_service as dsvca
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
+from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes, AccountStatus, DefaultBuckets, TransactionSource
-from enums import CollectionType
+from enums import ReportType, CollectionType
 from userInteraction.abstracts.userInteractionManager import UserIteractionManager
-import pandas as pd
 import mongoHelper
+
 
 class AccountManager():
     def __init__(self, user_notification_system: UserIteractionManager):
@@ -242,23 +243,100 @@ class AccountManager():
         if bucket is not None:
             self.uns.notify_user(f"{bucketName} priority updated to {prior}")
 
-    def print_waterfall(self):
-        #TODO IMPLEMENT
-        pass
-
-    def print_waterfall_summary(self):
+    def print_full_waterfall(self):
         accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
         account = dsvca.account_by_name(accountName)
+        bankTotal = self.uns.request_float("Bank Total: ")
+
+        self.print_waterfall_summary(account)
+        self.print_waterfall_buckets(account)
+        self.print_balances(accountName=accountName)
+        self.check_balance_against_total()
+
+    def print_waterfall_buckets(self, account: Account = None):
+        if account is None:
+            accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+            account = dsvca.account_by_name(accountName)
+
+        buckets = dsvca.buckets_by_account(account)
+        data = mongoHelper.list_mongo_to_pandas(buckets)
+        data.sort_values(by=["priority", 'due_day_of_month'], inplace=True)
+
+        self.uns.pretty_print_items(data)
+
+
+    def print_waterfall_summary(self, account: Account = None):
+        if account is None:
+            accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+            account = dsvca.account_by_name(accountName)
 
         buckets = dsvca.buckets_by_account(account)
         data = mongoHelper.list_mongo_to_pandas(buckets)
 
-        import pandasHelper as ph
-        #TODO Massage output
-        ph.pretty_print_dataframe(data)
-        ph.pretty_print_dataframe(data.sum())
+        waterfall_amount = data['waterfall_amount'].sum()
+        saved_amount = data['saved_amount'].sum()
+
+        total_saved = waterfall_amount + saved_amount
+        self.uns.notify_user(f"----Waterfall Summary----\n"
+                             f"Total Balance: {total_saved}\n"
+                             f"Saved for next cycle: {saved_amount}", delay_sec=0)
 
 
+    def add_open_balance(self):
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+        account = dsvca.account_by_name(accountName)
+
+        balanceName = self.uns.request_string("Balance Name: ")
+        balanceValue = self.uns.request_float("Pending Amount: ")
+
+        dsvca.add_open_balance_to_account(account, balanceName, balanceValue)
+
+        self.uns.notify_user(f"Balance {balanceName} added to {account} successfully.")
+
+    def delete_open_balance(self):
+        accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+        account = dsvca.account_by_name(accountName)
+
+
+        balanceName = self.uns.request_from_dict(dsvca.balances_as_dict_by_account(dsvca.account_by_name(accountName), ), "Balance:")
+
+        balance = dsvca.delete_open_balance_from_account(account, balanceName)
+
+        if balance is not None:
+            self.uns.notify_user(f"Balance {balanceName} deleted from {account} successfully.")
+        else:
+            raise Exception(f"Unable to delete balance from account")
+
+    def print_balances(self, accountName=None):
+        if accountName is None:
+            accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+        bankTotal = self.uns.request_float("Current Bank Total: ")
+
+        account = dsvca.account_by_name(accountName)
+        balances = dsvca.balances_by_account(account)
+        self.uns.notify_user(f"Bank Total: {bankTotal}\n"
+                             f"Allocated Total: {self.allocated_total(account)}", delay_sec=0)
+        self.uns.pretty_print_items(sorted(balances, key=lambda x: x.name),
+                                    title=ReportType.OPENBALANCES.name)
+
+        balance_total = self.check_balance_against_total(bankTotal, accountName=accountName)
+        self.uns.notify_user(f"Balance: {balance_total}")
+
+    def check_balance_against_total(self, total:float, accountName=None) -> float:
+        if accountName is None:
+            accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+
+        account = dsvca.account_by_name(accountName)
+        balances = dsvca.balances_by_account(account)
+
+        waterfall_saved_total = self.allocated_total(account)
+        balance_total = sum(b.amount for b in balances)
+
+        return total + balance_total - waterfall_saved_total
+
+    def allocated_total(self, account: Account):
+        buckets = dsvca.buckets_by_account(account)
+        return sum(b.saved_amount + b.waterfall_amount for b in buckets)
 if __name__ == "__main__":
 
 
