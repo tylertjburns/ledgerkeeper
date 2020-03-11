@@ -5,6 +5,7 @@ from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes, Acc
 from enums import ReportType, CollectionType
 from userInteraction.abstracts.userInteractionManager import UserIteractionManager
 import mongoHelper
+import pandas as pd
 
 
 class AccountManager():
@@ -67,7 +68,7 @@ class AccountManager():
                 if e in [DefaultBuckets._DEFAULT, DefaultBuckets._OTHER, DefaultBuckets._TAX_WITHOLDING]:
                     spendCat = SpendCategory.OTHER
                 elif e in [DefaultBuckets._CREDIT, DefaultBuckets._PAY_WITH_REIMBURSEMENT]:
-                    spendCat = SpendCategory.NA
+                    spendCat = SpendCategory.NOTAPPLICABLE
                 else:
                     raise NotImplementedError("Unhandled default bucket")
                 dsvca.add_bucket_to_account(account, e.name, 99, 99, spendCat)
@@ -101,6 +102,7 @@ class AccountManager():
 
         account = dsvca.account_by_name(accountName)
         buckets = dsvca.buckets_by_account(account)
+        self.uns.notify_user("\n------Buckets------", delay_sec=0)
         self.uns.pretty_print_items(sorted(buckets, key=lambda x: x.priority),
                                     title=CollectionType.BUCKETS.name)
 
@@ -139,7 +141,7 @@ class AccountManager():
                                  from_bucket="income_source",
                                  to_account=accountName,
                                  to_bucket=DefaultBuckets._DEFAULT.name,
-                                 spend_category=SpendCategory.NA,
+                                 spend_category=SpendCategory.NOTAPPLICABLE,
                                  date_stamp=date,
                                  notes=notes,
                                  source=TransactionSource.MANUALENTRY)
@@ -197,7 +199,7 @@ class AccountManager():
                                      from_bucket=DefaultBuckets._DEFAULT.name,
                                      to_account=account.account_name,
                                      to_bucket=bucket.name,
-                                     spend_category=SpendCategory.NA,
+                                     spend_category=SpendCategory.NOTAPPLICABLE,
                                      date_stamp=date,
                                      notes="",
                                      source=TransactionSource.APPLICATION)
@@ -277,7 +279,7 @@ class AccountManager():
         saved_amount = data['saved_amount'].sum()
 
         total_saved = waterfall_amount + saved_amount
-        self.uns.notify_user(f"----Waterfall Summary----\n"
+        self.uns.notify_user(f"\n------Waterfall Summary------\n"
                              f"Total Balance: {total_saved}\n"
                              f"Saved for next cycle: {saved_amount}", delay_sec=0)
 
@@ -314,7 +316,8 @@ class AccountManager():
 
         account = dsvca.account_by_name(accountName)
         balances = dsvca.balances_by_account(account)
-        self.uns.notify_user(f"Bank Total: {bankTotal}\n"
+        self.uns.notify_user(f"\n------Balances------\n"
+                             f"Bank Total: {bankTotal}\n"
                              f"Allocated Total: {self.allocated_total(account)}", delay_sec=0)
         self.uns.pretty_print_items(sorted(balances, key=lambda x: x.name),
                                     title=ReportType.OPENBALANCES.name)
@@ -322,7 +325,7 @@ class AccountManager():
         balance_total = self.check_balance_against_total(bankTotal, accountName=accountName)
         self.uns.notify_user(f"Balance: {balance_total}")
 
-    def check_balance_against_total(self, total:float, accountName=None) -> float:
+    def check_balance_against_total(self, total: float, accountName=None) -> float:
         if accountName is None:
             accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
 
@@ -337,6 +340,63 @@ class AccountManager():
     def allocated_total(self, account: Account):
         buckets = dsvca.buckets_by_account(account)
         return sum(b.saved_amount + b.waterfall_amount for b in buckets)
+
+    def save_buckets_as_csv(self, accountName: str = None):
+        if accountName is None:
+            accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+
+        account = dsvca.account_by_name(accountName)
+        buckets = dsvca.buckets_by_account(account)
+        data = mongoHelper.list_mongo_to_pandas(buckets)
+
+        filepath = self.uns.request_save_filepath()
+
+        data.to_csv(filepath)
+        if data is None:
+            return
+
+        self.uns.notify_user(f"Buckets data written successfully to {filepath}")
+
+    def buckets_from_csv(self, accountName: str = None):
+        if accountName is None:
+            accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+
+        account = dsvca.account_by_name(accountName)
+
+        filepath = self.uns.request_open_filepath()
+        data = pd.read_csv(filepath)
+        if data is None:
+            return
+
+        self._update_buckets_from_dataframe(account, data)
+        self.uns.notify_user(f"Buckets data updated successfully from {filepath}")
+
+    def _update_buckets_from_dataframe(self, account: Account, df: pd.DataFrame):
+
+        for index, row in df.iterrows():
+            name = row['name']
+            dsvca.update_bucket(account, name,
+                                priority=row["priority"],
+                                due_day_of_month=row["due_day_of_month"],
+                                spend_category=SpendCategory[row["spend_category"]],
+                                base_budget_amount=row["base_budget_amount"],
+                                perc_budget_amount=row["perc_budget_amount"],
+                                waterfall_amount=row["waterfall_amount"],
+                                saved_amount=row["saved_amount"],
+                                percent_of_income_adjustment_amount=row["percent_of_income_adjustment_amount"])
+
+
+    def print_positive_remaining(self, account:Account=None):
+        if account is None:
+            accountName = self.uns.request_from_dict(dsvca.accounts_as_dict())
+            account = dsvca.account_by_name(accountName)
+
+
+        buckets = dsvca.buckets_by_account(account)
+        data = mongoHelper.list_mongo_to_pandas(buckets)
+        filtered = data[data["saved_amount"] > 0].sort_values(by=["priority"])
+        self.uns.pretty_print_items(filtered, title="Positive Remaining Buckets")
+
 if __name__ == "__main__":
 
 

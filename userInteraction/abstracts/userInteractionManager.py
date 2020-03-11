@@ -36,7 +36,11 @@ class UserIteractionManager(ABC):
         pass
 
     @abstractmethod
-    def request_filepath(self):
+    def request_open_filepath(self):
+        pass
+
+    @abstractmethod
+    def request_save_filepath(self):
         pass
 
     @abstractmethod

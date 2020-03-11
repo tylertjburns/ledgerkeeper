@@ -86,7 +86,8 @@ class EquityManager():
         account = dsvca.account_by_name(accountName)
         
         data = dsvce.balance_sheet_over_time(relevant_months=relevant_mos, accountIds=[str(account.id)])
-        
+
+        self.uns.notify_user(f"\n---------Balance Sheet---------")
         self.uns.pretty_print_items(data)
 
     def plot_balance_over_time(self):
@@ -97,7 +98,6 @@ class EquityManager():
         ax = plot.plot_assets_liabilities_worth_over_time(relevant_mos, accountIds=[str(account.id)])
         if ax is None:
             self.uns.notify_user("No Data to show...")
-        # data = dsvce.balance_sheet_over_time(relevant_months=relevant_mos, accountIds=[str(account.id)])
 
 
 

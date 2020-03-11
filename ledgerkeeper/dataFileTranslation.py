@@ -166,8 +166,8 @@ def old_spend_category_switch(old:str):
         return SpendCategory[old.upper()]
     except:
         switcher = {
-            "": SpendCategory.NA,
-            "Income": SpendCategory.NA,
+            "": SpendCategory.NOTAPPLICABLE,
+            "Income": SpendCategory.NOTAPPLICABLE,
             "Investment": SpendCategory.INVESTMENT,
             "_NA": SpendCategory.NOEXPENSE,
             "Fun": SpendCategory.FUN,

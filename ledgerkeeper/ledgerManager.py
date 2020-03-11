@@ -214,7 +214,7 @@ class LedgerManager():
             to_account = self.uns.request_from_dict(dsvca.accounts_as_dict(), prompt="To Account:")
             to_bucket = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(to_account)),
                                            "To Bucket:")
-            spend_category = SpendCategory.NA
+            spend_category = SpendCategory.NOTAPPLICABLE
         elif transaction.credit == 0 and transaction.debit > 0:
             from_account = self.uns.request_from_dict(dsvca.accounts_as_dict(), prompt="From Account:")
             from_bucket = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(from_account)),

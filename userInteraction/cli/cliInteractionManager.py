@@ -124,9 +124,16 @@ class CliInteractionManager(UserIteractionManager):
                 print("Invalid Entry")
 
 
-    def request_filepath(self):
+    def request_open_filepath(self):
         root = tkinter.Tk()
         in_path = fd.askopenfilename()
+        root.destroy()
+
+        return in_path
+
+    def request_save_filepath(self):
+        root = tkinter.Tk()
+        in_path = fd.asksaveasfilename()
         root.destroy()
 
         return in_path

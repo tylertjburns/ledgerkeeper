@@ -55,7 +55,7 @@ class SpendCategory(MyEnum):
     CABLE_INTERNET = 22
     TRAVEL = 23
     NOEXPENSE = 24
-    NA = 25
+    NOTAPPLICABLE = 25
 
 class HandleTransactionMethod(MyEnum):
     SPLIT = 1

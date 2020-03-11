@@ -73,6 +73,8 @@ def accounts_sub_menu_switch(input:str):
         "K": delete_bucket,
         "M": remove_open_balance_from_account,
         "R": change_bucket_priority,
+        "RCSV": update_buckets_from_csv,
+        "WCSV": write_buckets_to_csv,
         'Y': cycle_waterfall,
         "X": ret
     }
@@ -86,6 +88,8 @@ def accounts_sub_menu():
     print("Apply [I]ncome")
     print("Add [B]ucket to account")
     print("Delete Buc[K]et")
+    print("[WCSV] Write buckets to CSV")
+    print("[RCSV] Update buckets from CSV")
     print("C[Y]cle Waterfall")
     print("Change P[R]iority")
     print("Add open balan[C]e to account")
@@ -232,6 +236,8 @@ def print_report():
         accountManager.print_full_waterfall()
     elif print_type == ReportType.OPENBALANCES:
         accountManager.print_balances()
+    elif print_type == ReportType.BUCKETSPOSITIVEREMAINING:
+        accountManager.print_positive_remaining()
     else:
         raise NotImplementedError(f"No print type setup for {print_type.name}")
 
@@ -284,7 +290,7 @@ def load_new_transactions():
     )
 
     # Get Filepath
-    in_path = userInteraction.request_filepath()
+    in_path = userInteraction.request_open_filepath()
 
     # React to user input
     if source == TransactionSource.BARCLAYCARDUS.name:
@@ -345,6 +351,13 @@ def remove_open_balance_from_account():
     print('******************** REMOVE OPEN BALANCE ********************')
     accountManager.delete_open_balance()
 
+def update_buckets_from_csv():
+    print('******************** BUCKETS FROM CSV ********************')
+    accountManager.buckets_from_csv()
+
+def write_buckets_to_csv():
+    print('******************** BUCKETS TO CSV ********************')
+    accountManager.save_buckets_as_csv()
 
 if __name__ == "__main__":
     import mongo_setup

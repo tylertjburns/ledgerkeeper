@@ -75,6 +75,28 @@ def add_bucket_to_account(account: Account,
 
     return bucket
 
+def update_bucket(account: Account, bucketName: str,
+                  priority: int = None,
+                  due_day_of_month: int = None,
+                  spend_category: SpendCategory = None,
+                  base_budget_amount: float = None,
+                  perc_budget_amount: float = None,
+                  waterfall_amount: float = None,
+                  saved_amount: float = None,
+                  percent_of_income_adjustment_amount: float = None,
+                  ):
+    bucket = bucket_by_account_and_name(account, bucketName)
+    bucket.priority = priority if priority else bucket.priority
+    bucket.due_day_of_month = due_day_of_month if due_day_of_month else bucket.due_day_of_month
+    bucket.spend_category = spend_category.name if spend_category else bucket.spend_category
+    bucket.base_budget_amount = base_budget_amount if base_budget_amount else bucket.base_budget_amount
+    bucket.perc_budget_amount = perc_budget_amount if perc_budget_amount else bucket.perc_budget_amount
+    bucket.waterfall_amount = waterfall_amount if waterfall_amount else bucket.waterfall_amount
+    bucket.saved_amount = saved_amount if saved_amount else bucket.saved_amount
+    bucket.percent_of_income_adjustment_amount = percent_of_income_adjustment_amount if percent_of_income_adjustment_amount else bucket.percent_of_income_adjustment_amount
+
+    account.save()
+
 def bucket_by_account_and_name(account: Account
                                , bucketName: str):
     bucket = [bucket for bucket in account.buckets if bucket.name == bucketName][0]
@@ -235,3 +257,4 @@ def balances_by_account(account:Account, raw_return=False) -> List[OpenBalance]:
         ]
 
         return balance_list
+
