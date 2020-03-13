@@ -85,20 +85,28 @@ def update_bucket(account: Account, bucketName: str,
                   saved_amount: float = None,
                   percent_of_income_adjustment_amount: float = None,
                   ):
+
     bucket = bucket_by_account_and_name(account, bucketName)
-    bucket.priority = priority if priority else bucket.priority
-    bucket.due_day_of_month = due_day_of_month if due_day_of_month else bucket.due_day_of_month
-    bucket.spend_category = spend_category.name if spend_category else bucket.spend_category
-    bucket.base_budget_amount = base_budget_amount if base_budget_amount else bucket.base_budget_amount
-    bucket.perc_budget_amount = perc_budget_amount if perc_budget_amount else bucket.perc_budget_amount
-    bucket.waterfall_amount = waterfall_amount if waterfall_amount else bucket.waterfall_amount
-    bucket.saved_amount = saved_amount if saved_amount else bucket.saved_amount
-    bucket.percent_of_income_adjustment_amount = percent_of_income_adjustment_amount if percent_of_income_adjustment_amount else bucket.percent_of_income_adjustment_amount
+
+    bucket.update(
+        priority = priority if priority else bucket.priority,
+        due_day_of_month = due_day_of_month if due_day_of_month else bucket.due_day_of_month,
+        spend_category = spend_category.name if spend_category else bucket.spend_category,
+        base_budget_amount = base_budget_amount if base_budget_amount else bucket.base_budget_amount,
+        perc_budget_amount = perc_budget_amount if perc_budget_amount else bucket.perc_budget_amount,
+        waterfall_amount = waterfall_amount if waterfall_amount else bucket.waterfall_amount,
+        saved_amount = saved_amount if saved_amount else bucket.saved_amount,
+        percent_of_income_adjustment_amount = percent_of_income_adjustment_amount if percent_of_income_adjustment_amount else bucket.percent_of_income_adjustment_amount
+    )
+    bucket.reload()
 
     account.save()
 
+    return bucket
+
 def bucket_by_account_and_name(account: Account
                                , bucketName: str):
+    # bucket = account.buckets.objects(name=bucketName).get()
     bucket = [bucket for bucket in account.buckets if bucket.name == bucketName][0]
     return bucket
 
@@ -210,7 +218,8 @@ def bucket_by_name(account:Account, bucket_name: str) -> Bucket:
         .filter(account__name=account.name).first()
 
 def spend_category_by_bucket_name(account:Account, bucket_name) -> str:
-    return bucket_by_name(account, bucket_name).spend_category
+    return bucket_by_account_and_name(account=account, bucketName=bucket_name).spend_category
+    # return bucket_by_name(account, bucket_name).spend_category
 
 
 def delete_bucket_from_account(account, bucketName):

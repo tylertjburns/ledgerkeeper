@@ -12,7 +12,7 @@ class Transaction(mongoengine.Document):
     description = mongoengine.StringField(required=True)
     debit = mongoengine.FloatField(required=True)
     credit = mongoengine.FloatField(required=True)
-
+    payment_type = mongoengine.StringField(required=True)
     handled = mongoengine.StringField(required=True)
     # Embedded Documents
 

@@ -1,12 +1,11 @@
 from enums import MyEnum
 
 class TransactionTypes(MyEnum):
-    APPLY_PAYMENT = 1
-    APPLY_INCOME = 2
-    MOVE_FUNDS = 3
-    BALANCE_BANK = 4
-    RECORD_EXPENSE = 5
-    RECEIVE_REFUND = 6
+    APPLY_INCOME = 2  #Used for receiving funds into an account
+    MOVE_FUNDS = 3  # Used for moving funds from one account/bucket to another
+    BALANCE_BANK = 4  # Used for collecting un-allocated available funds into the waterfall
+    RECORD_EXPENSE = 5  # Used for recording an expenditure
+    RECEIVE_REFUND = 6  # Used if receiving a refund for a payment that had been recorded previously
 
 class TransactionSource(MyEnum):
     PNC = 1
@@ -73,6 +72,12 @@ class DefaultBuckets(MyEnum):
     _OTHER = 3
     _TAX_WITHOLDING = 4
     _PAY_WITH_REIMBURSEMENT = 5
+
+class PaymentType(MyEnum):
+    CREDIT = 1
+    CASH = 2
+    BANK = 3
+    NOTAPPLICABLE = 4
 
 if __name__ == "__main__":
     enum = TransactionSource

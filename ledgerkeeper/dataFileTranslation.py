@@ -1,5 +1,5 @@
 import pandas as pd
-from ledgerkeeper.enums import TransactionTypes, TransactionSource, TransactionStatus, SpendCategory
+from ledgerkeeper.enums import TransactionTypes, TransactionSource, TransactionStatus, SpendCategory, PaymentType
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
 import uuid
@@ -39,12 +39,13 @@ def read_in_pnc_transactions(filepath: str):
 
 
         new = dsvct.enter_if_not_exists(transaction_category=transaction_category
-                                      , transaction_id=str(uuid.uuid4())
-                                      , description=transaction['Transaction']
-                                      , debit=debit
-                                      , credit=credit
-                                      , source=TransactionSource.PNC
-                                      , date_stamp=parser.parse(transaction['Date']))
+                                        , transaction_id=str(uuid.uuid4())
+                                        , description=transaction['Transaction']
+                                        , debit=debit
+                                        , credit=credit
+                                        , payment_type=PaymentType.BANK
+                                        , source=TransactionSource.PNC
+                                        , date_stamp=parser.parse(transaction['Date']))
 
         if new is not None:
             pnc_transactions.append(new)
@@ -74,12 +75,13 @@ def read_in_barclay_transactions(filepath: str):
             raise Exception(f"Unhandled transaction category for BarclaycardUS: {transaction['Category']}")
 
         new = dsvct.enter_if_not_exists(transaction_category=transaction_category
-                                      , transaction_id=str(uuid.uuid4())
-                                      , description=transaction['Description']
-                                      , debit=debit
-                                      , credit=credit
-                                      , source=TransactionSource.BARCLAYCARDUS
-                                      , date_stamp=parser.parse(transaction['Transaction Date']))
+                                        , transaction_id=str(uuid.uuid4())
+                                        , description=transaction['Description']
+                                        , debit=debit
+                                        , credit=credit
+                                        , source=TransactionSource.BARCLAYCARDUS
+                                        , payment_type=PaymentType.CREDIT
+                                        , date_stamp=parser.parse(transaction['Transaction Date']))
 
         if new is not None:
             barclay_transactions.append(new)
@@ -128,15 +130,25 @@ def read_in_old_ledgers(filepath: str, account: Account):
 
         trans_id = str(uuid.uuid4())
 
+        if ledger['Trans_Type'] == 'APPLY PMNT' and ledger['To'] == "PAYMENT - Credit":
+            payment_type = PaymentType.CREDIT
+        elif ledger['Trans_Type'] == 'APPLY PMNT' and ledger['To'] == "PAYMENT - Bank-PNC":
+            payment_type = PaymentType.BANK
+        elif ledger['Trans_Type'] == 'APPLY PMNT' and ledger['To'] == "PAYMENT - Cash":
+            payment_type = PaymentType.CASH
+        else:
+            payment_type = PaymentType.NOTAPPLICABLE
+
         # Add transaction fro reference
         transaction = dsvct.enter_if_not_exists(transaction_category=transaction_category
-                                              , transaction_id=trans_id
-                                              , description=ledger['Comment']
-                                              , debit=debit
-                                              , credit=credit
-                                              , source=TransactionSource.ARCHIVE
-                                              , date_stamp=parser.parse(ledger['Date'])
-                                              , handled=TransactionStatus.HANDLED)
+                                                , transaction_id=trans_id
+                                                , description=ledger['Comment']
+                                                , debit=debit
+                                                , credit=credit
+                                                , source=TransactionSource.ARCHIVE
+                                                , date_stamp=parser.parse(ledger['Date'])
+                                                , payment_type=payment_type
+                                                , handled=TransactionStatus.HANDLED)
 
 
         # Unsure about format, but confident no duplicates, therefore dont check for dups before entering
@@ -152,6 +164,7 @@ def read_in_old_ledgers(filepath: str, account: Account):
                                     , to_bucket=to_account
                                     , to_account=to_account
                                     , spend_category=spend_category
+                                    , payment_type=payment_type
                                     , date_stamp=parser.parse(ledger['Date'])
                                     , notes=ledger['Comment'])
 

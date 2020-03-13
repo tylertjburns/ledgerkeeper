@@ -3,7 +3,7 @@ from ledgerkeeper.mongoData.account import Account
 from mongoengine.queryset.visitor import Q
 import datetime
 from typing import List
-from ledgerkeeper.enums import TransactionTypes, TransactionSource, SpendCategory, TransactionTypes
+from ledgerkeeper.enums import TransactionTypes, TransactionSource, SpendCategory, TransactionTypes, PaymentType
 import pandas as pd
 
 def enter_if_not_exists(
@@ -17,6 +17,7 @@ def enter_if_not_exists(
         to_account: str,
         to_bucket: str,
         spend_category: SpendCategory,
+        payment_type: PaymentType,
         source: TransactionSource,
         date_stamp: datetime.datetime = datetime.datetime.now,
         notes: str = "") -> LedgerItem:
@@ -36,6 +37,7 @@ def enter_if_not_exists(
                                   , to_account=to_account
                                   , to_bucket=to_bucket
                                   , spend_category=spend_category
+                                  , payment_type=payment_type
                                   , date_stamp=date_stamp
                                   , notes=notes
                                   , source=source)
@@ -52,6 +54,7 @@ def enter_ledger_entry(transaction_id: str,
                        to_bucket: str,
                        source: TransactionSource,
                        spend_category: SpendCategory,
+                       payment_type: PaymentType,
                        date_stamp: datetime.datetime = datetime.datetime.now,
                        notes: str = "") -> LedgerItem:
 
@@ -67,6 +70,7 @@ def enter_ledger_entry(transaction_id: str,
     ledger.to_bucket = to_bucket
     ledger.date_stamp = date_stamp
     ledger.spend_category = spend_category.name
+    ledger.payment_type = payment_type.name
     ledger.notes = notes
     ledger.source = source.name
 

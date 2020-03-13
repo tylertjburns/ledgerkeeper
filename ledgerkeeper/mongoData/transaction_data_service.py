@@ -1,5 +1,5 @@
 from ledgerkeeper.mongoData.transaction import Transaction
-from ledgerkeeper.enums import TransactionStatus, TransactionTypes, TransactionSource
+from ledgerkeeper.enums import TransactionStatus, TransactionTypes, TransactionSource, PaymentType
 import datetime
 from typing import List
 
@@ -10,6 +10,7 @@ def enter_if_not_exists(transaction_id: str,
     debit: float,
     credit: float,
     source: TransactionSource,
+    payment_type: PaymentType,
     date_stamp: datetime.datetime = datetime.datetime.now,
     handled: TransactionStatus = TransactionStatus.UNHANDLED) -> Transaction:
 
@@ -18,14 +19,15 @@ def enter_if_not_exists(transaction_id: str,
     if len(transactions) > 0:
         return None
     else:
-        return enter_transaction(transaction_id
-                                  , description
-                                  , transaction_category
-                                  , debit
-                                  , credit
-                                  , source
-                                  , date_stamp
-                                  , handled
+        return enter_transaction(transaction_id=transaction_id
+                                  , description=description
+                                  , transaction_category=transaction_category
+                                  , debit=debit
+                                  , credit=credit
+                                  , source=source
+                                  , date_stamp=date_stamp
+                                  , handled=handled
+                                  , payment_type=payment_type
                                  )
 
 def enter_transaction(transaction_id: str,
@@ -34,6 +36,7 @@ def enter_transaction(transaction_id: str,
     debit: float,
     credit: float,
     source: TransactionSource,
+    payment_type: PaymentType,
     date_stamp: datetime.datetime = datetime.datetime.now,
     handled:TransactionStatus = TransactionStatus.UNHANDLED) -> Transaction:
 
@@ -46,7 +49,7 @@ def enter_transaction(transaction_id: str,
     transaction.date_stamp = date_stamp
     transaction.source = source.name
     transaction.handled = handled.name
-
+    transaction.payment_type = payment_type.name
     transaction.save()
 
     return transaction

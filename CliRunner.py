@@ -9,13 +9,15 @@ from enums import CollectionType, ReportType, PlotType
 import ledgerkeeper.ledgerManager as lm
 import ledgerkeeper.accountManager as am
 import balancesheet.equityManager as em
-from userInteraction.cli.cliInteractionManager import CliInteractionManager
+import ledgerkeeper.transactionManager as tm
+from userInteraction.financeCliInteraction import FinanceCliInteraction
 
 NOTIMPLEMENTED = "-------------- NOT IMPLEMENTED ----------------"
-userInteraction = CliInteractionManager()
+userInteraction = FinanceCliInteraction()
 ledgerManager = lm.LedgerManager(userInteraction)
 accountManager = am.AccountManager(userInteraction)
 equityManager = em.EquityManager(userInteraction)
+transactionManager = tm.TransactionManager(userInteraction)
 
 def main():
     loop(main_menu_switch, main_menu)
@@ -72,8 +74,9 @@ def accounts_sub_menu_switch(input:str):
         "I": apply_income,
         "K": delete_bucket,
         "M": remove_open_balance_from_account,
-        "R": change_bucket_priority,
+        "O": change_bucket_priority,
         "RCSV": update_buckets_from_csv,
+        "T": enter_transaction,
         "WCSV": write_buckets_to_csv,
         'Y': cycle_waterfall,
         "X": ret
@@ -86,12 +89,13 @@ def accounts_sub_menu():
     print("[D]elete Account")
     print("D[E]activate Account")
     print("Apply [I]ncome")
+    print("Enter [T]ransaction")
     print("Add [B]ucket to account")
     print("Delete Buc[K]et")
     print("[WCSV] Write buckets to CSV")
     print("[RCSV] Update buckets from CSV")
     print("C[Y]cle Waterfall")
-    print("Change P[R]iority")
+    print("Change Pri[O]rity")
     print("Add open balan[C]e to account")
     print("Re[M]ove open balance from account")
     print("[X] Back")
@@ -167,8 +171,8 @@ def equity_sub_menu_loop():
 
 def plot_switch(input: PlotType):
     switcher = {
-        PlotType.HISTORY_BY_CATEGORY: ledgerManager.plot_history_by_category,
-        PlotType.PROJECTED_FINANCE: ledgerManager.plot_projected_finance,
+        PlotType.HISTORY_BY_CATEGORY: accountManager.plot_history_by_category,
+        PlotType.PROJECTED_FINANCE: accountManager.plot_projected_finance,
         PlotType.ASSET_LIABILITY_NET_OVER_TIME: equityManager.plot_balance_over_time,
         None: ret
     }
@@ -187,11 +191,11 @@ def add_new_account():
 
 def delete_account():
     print('******************** DELETE ACCOUNT *********************')
-    accountManager.delete_account()
+    accountManager.delete_account(ledgerManager)
 
 def add_ledger():
     print('******************** ADD LEDGER **********************')
-    ledgerManager.add_ledger()
+    ledgerManager.add_ledger_manually()
 
 def query_ledger():
     print('******************** QUERY LEDGER ********************')
@@ -207,7 +211,7 @@ def print_collection():
     if print_type == CollectionType.LEDGER:
         ledgerManager.print_ledger()
     elif print_type == CollectionType.TRANSACTIONS:
-        ledgerManager.print_transactions()
+        transactionManager.print_transactions()
     elif print_type == CollectionType.BUCKETS:
         accountManager.print_buckets()
     elif print_type == CollectionType.ACCOUNTS:
@@ -255,15 +259,13 @@ def clear_collection():
     elif collection == CollectionType.TRANSACTIONS:
         dsvct.clear_collection()
     elif collection == CollectionType.ENTITIES:
-        dsvce.clear_collection()
+        dsvce.clear_equities()
     else:
         userInteraction.notify_user(f"Undefined collection for clearing {collection}")
         return
 
     userInteraction.notify_user(f"{collection} collection cleared\n")
 
-
-    ledgerManager.clear_collection()
 
 def delete_a_ledger_item():
     print('******************* DELETE A LEDGER ITEM *************')
@@ -272,11 +274,10 @@ def delete_a_ledger_item():
 def exit_app():
     print('******************** EXIT APP ************************')
     ledgerManager.uns.notify_user("Goodbye!")
-    # raise KeyboardInterrupt()
 
 def process_transactions_loop():
     print('******************** Process Transaction ***************')
-    ledgerManager.process_transactions_loop()
+    transactionManager.process_transactions_loop(accountManager)
 
 def load_new_transactions():
     print('******************** Load New Transactions *************')
@@ -358,6 +359,10 @@ def update_buckets_from_csv():
 def write_buckets_to_csv():
     print('******************** BUCKETS TO CSV ********************')
     accountManager.save_buckets_as_csv()
+
+def enter_transaction():
+    print('******************** RECORD EXPENSE ********************')
+    accountManager.enter_manual_transaction(ledgerManager)
 
 if __name__ == "__main__":
     import mongo_setup

@@ -26,7 +26,11 @@ class CliInteractionManager(UserIteractionManager):
 
     def request_int(self, prompt: str):
         while True:
-            ret = self._int_tryParse(input(prompt))
+            inp = input(prompt).upper()
+            if inp == "X":
+                return None
+
+            ret = self._int_tryParse(inp)
             if ret is not False:
                 return ret
             else:
@@ -137,6 +141,9 @@ class CliInteractionManager(UserIteractionManager):
         root.destroy()
 
         return in_path
+
+    def request_you_sure(self, prompt=None):
+        return self.request_from_dict({1: "Yes", 2: "No"}, prompt)
 
     def pretty_print_items(self, items, title=None):
         if type(items) == str:

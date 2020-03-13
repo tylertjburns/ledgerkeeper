@@ -15,6 +15,7 @@ class LedgerItem(mongoengine.Document):
     to_account = mongoengine.StringField(required=True)
     to_bucket = mongoengine.StringField(required=True)
     spend_category = mongoengine.StringField(required=True)
+    payment_type = mongoengine.StringField(required=True)
     amount_covered = mongoengine.FloatField(default=0)
     refunded = mongoengine.FloatField(default=0)
     notes = mongoengine.StringField(default="")
