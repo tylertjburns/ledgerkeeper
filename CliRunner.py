@@ -4,7 +4,7 @@ import ledgerkeeper.mongoData.transaction_data_service as dsvct
 import balancesheet.mongoData.equities_data_service as dsvce
 
 import ledgerkeeper.dataFileTranslation as dft
-from ledgerkeeper.enums import TransactionSource
+from ledgerkeeper.enums import TransactionSource, TransactionTypes
 from enums import CollectionType, ReportType, PlotType
 import ledgerkeeper.ledgerManager as lm
 import ledgerkeeper.accountManager as am
@@ -187,11 +187,11 @@ def plot_request_loop():
 
 def add_new_account():
     print('******************** NEW ACCOUNT *********************')
-    accountManager.add_new_account()
+    accountManager.add_new_account(inputGetter=userInteraction, accountDataService=dsvca.AccountDataservice())
 
 def delete_account():
     print('******************** DELETE ACCOUNT *********************')
-    accountManager.delete_account(ledgerManager)
+    accountManager.delete_account(inputGetter=userInteraction, accountDataService=dsvca.AccountDataservice())
 
 def add_ledger():
     print('******************** ADD LEDGER **********************')
@@ -361,8 +361,10 @@ def write_buckets_to_csv():
     accountManager.save_buckets_as_csv()
 
 def enter_transaction():
-    print('******************** RECORD EXPENSE ********************')
-    accountManager.enter_manual_transaction(ledgerManager)
+    print('******************** ENTER TRANSACTION ********************')
+    action = accountManager.get_transaction_action_from_requested_input(inputGetter=userInteraction)
+    if action is not None:
+        action()
 
 if __name__ == "__main__":
     import mongo_setup

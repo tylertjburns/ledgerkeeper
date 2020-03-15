@@ -1,6 +1,7 @@
 from userInteraction.abstracts.userInteractionManager import UserIteractionManager
 from ledgerkeeper.mongoData.account import Account
 from abc import ABC, abstractmethod
+from ledgerkeeper.interfaces.IAccountDataService import IAccountDataService
 
 class FinanceInteraction(UserIteractionManager, ABC):
     # region Account UI
@@ -9,7 +10,7 @@ class FinanceInteraction(UserIteractionManager, ABC):
         pass
 
     @abstractmethod
-    def select_account(self, statusList=None):
+    def select_account(self, accountDataService: IAccountDataService, statusList=None):
         pass
 
     @abstractmethod

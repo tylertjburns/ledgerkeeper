@@ -1,6 +1,6 @@
 import ledgerkeeper.mongoData.account_data_service as dsvca
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
-import ledgerkeeper.mongoData.transaction_data_service as dsvct
+from ledgerkeeper.mongoData.transaction_data_service import TransactionDataService as dsvct
 from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes, AccountStatus, DefaultBuckets, TransactionSource, PaymentType, TransactionStatus
 from enums import ReportType, CollectionType
@@ -8,31 +8,34 @@ from userInteraction.abstracts.financeInteraction import FinanceInteraction
 import mongoHelper
 import pandas as pd
 import uuid
-from sessionState import SessionState
 import plotter as plt
+
+from ledgerkeeper.interfaces.ITransactionDataService import ITransactionDataService
+from ledgerkeeper.interfaces.IAccountDataService import IAccountDataService
+from ledgerkeeper.interfaces.transaction_interfaces import ITransactionApprover, ITransactionEnterer
+from ledgerkeeper.interfaces.bucket_interfaces import IBucketUpdater
+from interfaces.general import IIdGenerator
 
 
 class AccountManager():
-    def __init__(self, user_interaction_system: FinanceInteraction):
-        self.uns = user_interaction_system
-        self.state = SessionState()
 
-    def enter_manual_transaction(self, ledgerManager):
+    def get_transaction_action_from_requested_input(self, inputGetter: FinanceInteraction):
         swticher = {
             TransactionTypes.APPLY_INCOME: self._apply_income,
             TransactionTypes.BALANCE_BANK: self._balance_bank,
             TransactionTypes.RECORD_EXPENSE: self._record_expense,
             TransactionTypes.RECEIVE_REFUND: self._receive_refund
         }
-
-        transaction_category = self.uns.request_enum(TransactionTypes)
-
-        action = swticher.get(transaction_category, None)
+        input = inputGetter.request_enum(TransactionTypes)
+        transaction_type = input.get("transaction_type", None)
+        action = swticher.get(transaction_type, None)
 
         if action is not None:
-            action(ledgerManager)
+            return action
         else:
-            raise NotImplementedError(f"Unhandled Transaction Type: {transaction_category}")
+            raise NotImplementedError(f"Unhandled Transaction Type: {transaction_type}")
+
+
 
     def _apply_income(self, ledgerManager):
         self.uns.notify_user("Not Implemented")
@@ -40,17 +43,22 @@ class AccountManager():
     def _balance_bank(self, ledgerManager):
         self.uns.notify_user("Not Implemented")
 
-    def _record_expense(self, ledgerManager, transactionManager):
-        trans_id = str(uuid.uuid4())
+    def _record_expense(self,
+                        inputGetter: FinanceInteraction,
+                        id_generator: IIdGenerator,
+                        transactionEnterer: ITransactionDataService,
+                        transactionApprover: ITransactionApprover,
+                        bucketUpdater: IBucketUpdater):
+        trans_id = id_generator.generate_new_id()
 
-        input = self.uns.get_record_expense_input()
+        input = inputGetter.get_record_expense_input()
         if input is None:
             return
 
         from_account = input['from_account']
         from_bucket = input['from_bucket']
 
-        transaction = dsvct.enter_if_not_exists(
+        transaction = transactionEnterer.enter_if_not_exists(
             transaction_id=trans_id,
             description=input["description"],
             transaction_category=TransactionTypes.RECORD_EXPENSE,
@@ -62,8 +70,9 @@ class AccountManager():
             handled=TransactionStatus.UNHANDLED
         )
 
-        ledger = ledgerManager.approve_transaction(transaction, self)
-        dsvca.update_bucket_saved_amount(account=from_account, bucketName=ledger.from_bucket, newAmount=from_bucket.saved_amount - input['debit'])
+        ledger = transactionApprover.approve_transaction(transaction)
+
+        bucketUpdater.update_bucket(account=from_account, bucketName=ledger.from_bucket, saved_amount=from_bucket.saved_amount - input['debit'])
 
         # Need to add an open balance if the payment type was Bank
         if input['payment_type'] == PaymentType.BANK:
@@ -74,17 +83,20 @@ class AccountManager():
         self.uns.notify_user("Not Implemented")
 
 
-    def delete_account(self, ledgerManager, account:Account=None):
-        account = account if account else self.uns.select_account()
+    def delete_account(self
+                       , inputGetter: FinanceInteraction
+                       , accountDataService: IAccountDataService
+                       , account:Account=None):
+        account = account if account else inputGetter.select_account(accountDataService=accountDataService)
         if account is None:
             return
 
-        yousure = self.uns.request_you_sure("Are you sure? This will break all reference to this account!")
+        yousure = inputGetter.request_you_sure("Are you sure? This will break all reference to this account!")
         if yousure is None:
             return
 
         if yousure == "Yes":
-            buckets = dsvca.buckets_by_account(account)
+            buckets = accountDataService.buckets_by_account(account)
 
             waterfall_amt = 0
             saved_amt = 0
@@ -94,9 +106,9 @@ class AccountManager():
 
             okay_to_delete = False
             if((waterfall_amt > 0) or (saved_amt > 0)):
-                yousure = self.uns.request_you_sure("Funds in account. Are you sure?")
+                yousure = inputGetter.request_you_sure("Funds in account. Are you sure?")
                 if yousure is None:
-                    return
+                    return False
 
                 if yousure == "Yes":
                     okay_to_delete = True
@@ -104,10 +116,14 @@ class AccountManager():
                 okay_to_delete = True
 
             if okay_to_delete:
-                dsvca.delete_account(account.account_name)
-                self.uns.notify_user(f"Account {account.account_name} Deleted")
+                accountDataService.delete_account(account.account_name)
+                inputGetter.notify_user(f"Account {account.account_name} Deleted")
+                return True
             else:
-                self.uns.notify_user(f"Deletion Cancelled.")
+                inputGetter.notify_user(f"Deletion Cancelled.")
+                return True
+
+
 
     def inactivate_account(self, account:Account=None):
         account = account if account else self.uns.select_account()
@@ -117,12 +133,14 @@ class AccountManager():
         if inactive is not None:
             self.uns.notify_user(f"Account {account.account_name} Deactivated!")
 
-    def add_new_account(self) -> Account:
-        input = self.uns.get_add_new_account_input()
+    def add_new_account(self
+                        , inputGetter: FinanceInteraction
+                        , accountDataService: IAccountDataService) -> Account:
+        input = inputGetter.get_add_new_account_input()
         if input is None:
             return None
 
-        account = dsvca.enter_account_if_not_exists(name=input['account_name'], type=input['account_type'], description=input['description'])
+        account = accountDataService.enter_account_if_not_exists(name=input['account_name'], type=input['account_type'], description=input['description'])
 
         if account is not None:
             for e in DefaultBuckets:
@@ -132,7 +150,7 @@ class AccountManager():
                     spendCat = SpendCategory.NOTAPPLICABLE
                 else:
                     raise NotImplementedError("Unhandled default bucket")
-                dsvca.add_bucket_to_account(account, e.name, 99, 99, spendCat)
+                accountDataService.add_bucket_to_account(account, e.name, 99, 99, spendCat)
 
             self.uns.notify_user("Account created successfully!")
         else:

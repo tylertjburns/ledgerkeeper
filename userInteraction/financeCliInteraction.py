@@ -6,6 +6,7 @@ import ledgerkeeper.mongoData.transaction_data_service as dsvct
 from ledgerkeeper.mongoData.transaction import Transaction
 
 from ledgerkeeper.mongoData.account import Account
+from ledgerkeeper.interfaces.IAccountDataService import IAccountDataService
 from ledgerkeeper.enums import PaymentType, AccountType, SpendCategory, TransactionTypes, TransactionSplitType
 from enums import CollectionType
 
@@ -13,16 +14,16 @@ class FinanceCliInteraction(FinanceInteraction, CliInteractionManager):
 
     # region Account UI
     def request_bank_total(self):
-        return self.uns.request_float("Current Bank Total: ")
+        return self.request_float("Current Bank Total: ")
 
-    def select_account(self, statusList=None):
-        accountName = self.request_from_dict(dsvca.accounts_as_dict(statusList=statusList))
+    def select_account(self, accountDataService: IAccountDataService, statusList=None):
+        accountName = self.request_from_dict(accountDataService.accounts_as_dict(statusList=statusList))
         if accountName is None:
             return None
-        return dsvca.account_by_name(accountName)
+        return accountDataService.account_by_name(accountName)
 
     def select_collection(self):
-        return self.uns.request_enum(CollectionType)
+        return self.request_enum(CollectionType)
 
     def get_record_expense_input(self, accountManager):
         ret = {}
