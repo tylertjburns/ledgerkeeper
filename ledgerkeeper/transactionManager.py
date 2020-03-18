@@ -6,12 +6,13 @@ from ledgerkeeper.mongoData.transaction import Transaction
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
 import ledgerkeeper.mongoData.account_data_service as dsvca
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
-from userInteraction.abstracts.financeInteraction import FinanceInteraction
+from userInteraction.interfaces.IFinanceInteraction import IFinanceInteraction
 
 import uuid
+from ledgerkeeper.interfaces.ITransactionManager import ITransactionManager
 
-class TransactionManager():
-    def __init__(self, user_notification_system: FinanceInteraction):
+class TransactionManager(ITransactionManager):
+    def __init__(self, user_notification_system: IFinanceInteraction):
         self.uns = user_notification_system
 
     def print_transactions(self):

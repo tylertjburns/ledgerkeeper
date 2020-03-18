@@ -1,5 +1,5 @@
 import balancesheet.mongoData.equities_data_service as dsvce
-from userInteraction.abstracts.userInteractionManager import UserIteractionManager
+from userInteraction.interfaces.IAtomicInteractionHelper import UserIteractionManager
 import ledgerkeeper.mongoData.account_data_service as dsvca
 from balancesheet.enums import EquityClass, AssetType, LiabiltyType, EquityTimeHorizon, EquityStatus, EquityContingency
 import plotter as plot

@@ -1,7 +1,5 @@
-from userInteraction.abstracts.userInteractionManager import UserIteractionManager
+from userInteraction.interfaces.IAtomicInteractionHelper import IAtomicInteractionHelper
 import time
-import pandas as pd
-import json
 from enum import Enum
 from dateutil import parser
 import datetime
@@ -11,12 +9,11 @@ from typing import Dict
 import tkinter
 import tkinter.filedialog as fd
 
-import mongoHelper
-import pandasHelper
+
 
 GOBACK = "X"
 
-class CliInteractionManager(UserIteractionManager):
+class CliInteractionManager(IAtomicInteractionHelper):
     def notify_user(self, text: str, delay_sec:int =1):
         print(text)
         time.sleep(delay_sec)
@@ -145,25 +142,7 @@ class CliInteractionManager(UserIteractionManager):
     def request_you_sure(self, prompt=None):
         return self.request_from_dict({1: "Yes", 2: "No"}, prompt)
 
-    def pretty_print_items(self, items, title=None):
-        if type(items) == str:
-            data = pd.io.json.json_normalize(json.loads(items))
-        elif type(items) is list:
-            data = mongoHelper.list_mongo_to_pandas(items)
-        elif type(items) is pd.DataFrame:
-            data = items
-        else:
-            raise NotImplementedError(f"Unhandled printable object {type(items)}")
 
-        if title is None:
-            title = ""
-        else:
-            title = title + "\n"
-
-        print(f"{title}# of items {len(data)}")
-
-        if len(data) > 0:
-            pandasHelper.pretty_print_dataframe(data)
 
 
 if __name__ == "__main__":

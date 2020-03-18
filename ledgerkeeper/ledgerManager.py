@@ -4,13 +4,13 @@ from ledgerkeeper.enums import HandleTransactionMethod, TransactionTypes, Transa
 from enums import CollectionType
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
-from userInteraction.abstracts.financeInteraction import FinanceInteraction
+from userInteraction.interfaces.IFinanceInteraction import IFinanceInteraction
 import uuid
 
 import plotter as plt
 
 class LedgerManager():
-    def __init__(self, user_notification_system: FinanceInteraction):
+    def __init__(self, user_notification_system: IFinanceInteraction):
         self.uns = user_notification_system
 
     def add_ledger_manually(self):

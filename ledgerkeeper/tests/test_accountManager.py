@@ -15,25 +15,17 @@ from unittest.mock import patch
 
 
 class test_AccountManager(unittest.TestCase):
-    # def __init__(self):
-    #     super().__init__(self)
-    #     self.db = None
-
-    # @classmethod
-    # def setUpClass(cls):
-    #     mongoengine.connect('mongoenginetest', host='mongomock://localhost')
-    #
-    # @classmethod
-    # def tearDownClass(cls):
-    #    mongoengine.disconnect()
+    def __init__(self, *args, **kwargs):
+        super(test_AccountManager, self).__init__(*args, **kwargs)
+        self.db = None
 
     @classmethod
     def setUpClass(self) -> None:
-        mongoengine.connect('mongoenginetest',  host='localhost:27017', alias='core')
+        self.db = mongoengine.connect('mongoenginetest',  host='localhost:27017', alias='core')
 
     @classmethod
     def tearDownClass(self) -> None:
-        mongoengine.disconnect()
+        self.db = mongoengine.disconnect()
 
 
     @patch('builtins.input', side_effect=['1', 'Test Name', 'Test Description'])

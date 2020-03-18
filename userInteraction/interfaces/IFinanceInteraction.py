@@ -1,8 +1,7 @@
-from userInteraction.abstracts.userInteractionManager import UserIteractionManager
 from ledgerkeeper.mongoData.account import Account
 from abc import ABC, abstractmethod
 
-class FinanceInteraction(UserIteractionManager, ABC):
+class IFinanceInteraction(ABC):
     # region Account UI
     @abstractmethod
     def request_bank_total(self):
@@ -72,5 +71,11 @@ class FinanceInteraction(UserIteractionManager, ABC):
 
     @abstractmethod
     def get_enter_ledger_from_expense_transaction_input(self):
+        pass
+    # endregion
+
+    # region Printing
+    @abstractmethod
+    def pretty_print_items(self, items, title=None):
         pass
     # endregion

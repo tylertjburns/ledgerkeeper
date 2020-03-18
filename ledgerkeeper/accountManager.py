@@ -4,7 +4,7 @@ import ledgerkeeper.mongoData.transaction_data_service as dsvct
 from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes, AccountStatus, DefaultBuckets, TransactionSource, PaymentType, TransactionStatus
 from enums import ReportType, CollectionType
-from userInteraction.abstracts.financeInteraction import FinanceInteraction
+from userInteraction.interfaces.IFinanceInteraction import FinanceInteraction
 import mongoHelper
 import pandas as pd
 import uuid
@@ -30,17 +30,17 @@ class AccountManager():
         action = swticher.get(transaction_category, None)
 
         if action is not None:
-            action(ledgerManager)
+            action()
         else:
             raise NotImplementedError(f"Unhandled Transaction Type: {transaction_category}")
 
-    def _apply_income(self, ledgerManager):
+    def _apply_income(self):
         self.uns.notify_user("Not Implemented")
 
-    def _balance_bank(self, ledgerManager):
+    def _balance_bank(self):
         self.uns.notify_user("Not Implemented")
 
-    def _record_expense(self, ledgerManager, transactionManager):
+    def _record_expense(self):
         trans_id = str(uuid.uuid4())
 
         input = self.uns.get_record_expense_input()
@@ -449,7 +449,5 @@ class AccountManager():
 
 
 if __name__ == "__main__":
-
-
     a = AccountManager()
     a.print_waterfall_summary()

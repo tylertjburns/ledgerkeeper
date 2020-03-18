@@ -1,19 +1,20 @@
-from userInteraction.abstracts.financeInteraction import FinanceInteraction
-from userInteraction.cli.cliInteractionManager import  CliInteractionManager
+from userInteraction.interfaces.IFinanceInteraction import IFinanceInteraction
+from userInteraction.cli.cliInteractionManager import CliInteractionManager
 import ledgerkeeper.mongoData.account_data_service as dsvca
-import ledgerkeeper.mongoData.ledger_data_service as dsvcl
-import ledgerkeeper.mongoData.transaction_data_service as dsvct
-from ledgerkeeper.mongoData.transaction import Transaction
+import pandas as pd
+import json
+import mongoHelper
+import pandasHelper
 
 from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.enums import PaymentType, AccountType, SpendCategory, TransactionTypes, TransactionSplitType
 from enums import CollectionType
 
-class FinanceCliInteraction(FinanceInteraction, CliInteractionManager):
+class FinanceCliInteraction(IFinanceInteraction, CliInteractionManager):
 
     # region Account UI
     def request_bank_total(self):
-        return self.uns.request_float("Current Bank Total: ")
+        return self.request_float("Current Bank Total: ")
 
     def select_account(self, statusList=None):
         accountName = self.request_from_dict(dsvca.accounts_as_dict(statusList=statusList))
@@ -22,7 +23,7 @@ class FinanceCliInteraction(FinanceInteraction, CliInteractionManager):
         return dsvca.account_by_name(accountName)
 
     def select_collection(self):
-        return self.uns.request_enum(CollectionType)
+        return self.request_enum(CollectionType)
 
     def get_record_expense_input(self, accountManager):
         ret = {}
@@ -69,9 +70,9 @@ class FinanceCliInteraction(FinanceInteraction, CliInteractionManager):
 
     def get_move_funds_input(self, account: Account):
         ret={}
-        fromB = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(account), "Select from bucket:")
-        toB = self.uns.request_from_dict(dsvca.buckets_as_dict_by_account(account, set(fromB)), "Select to bucket:")
-        amount = self.uns.request_float("Amount to move:", forcePos=True)
+        fromB = self.request_from_dict(dsvca.buckets_as_dict_by_account(account), "Select from bucket:")
+        toB = self.request_from_dict(dsvca.buckets_as_dict_by_account(account, set(fromB)), "Select to bucket:")
+        amount = self.request_float("Amount to move:", forcePos=True)
 
         ret['amount'] = amount
         ret['fromBucket'] = dsvca.bucket_by_account_and_name(account, fromB)
@@ -178,7 +179,7 @@ class FinanceCliInteraction(FinanceInteraction, CliInteractionManager):
         to_bucket_name = self.request_from_dict(dsvca.buckets_as_dict_by_account(dsvca.account_by_name(ret['to_account'] )),
                                                "To Bucket:")
         ret['to_bucket'] = dsvca.bucket_by_account_and_name(ret['to_account'], to_bucket_name)
-        ret['notes'] = self.uns.request_string("Notes:")
+        ret['notes'] = self.request_string("Notes:")
         return ret
 
     def get_enter_ledger_from_expense_transaction_input(self):
@@ -190,4 +191,26 @@ class FinanceCliInteraction(FinanceInteraction, CliInteractionManager):
         ret['from_bucket'] = dsvca.bucket_by_account_and_name(ret['from_account'], from_bucket_name)
 
         return ret
+    # endregion
+
+    # region Printing
+    def pretty_print_items(self, items, title=None):
+        if type(items) == str:
+            data = pd.io.json.json_normalize(json.loads(items))
+        elif type(items) is list:
+            data = mongoHelper.list_mongo_to_pandas(items)
+        elif type(items) is pd.DataFrame:
+            data = items
+        else:
+            raise NotImplementedError(f"Unhandled printable object {type(items)}")
+
+        if title is None:
+            title = ""
+        else:
+            title = title + "\n"
+
+        print(f"{title}# of items {len(data)}")
+
+        if len(data) > 0:
+            pandasHelper.pretty_print_dataframe(data)
     # endregion

@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict
 
-class UserIteractionManager(ABC):
+class IAtomicInteractionHelper(ABC):
 
     @abstractmethod
     def notify_user(self, text: str):
@@ -48,8 +48,5 @@ class UserIteractionManager(ABC):
     def request_you_sure(self, items, prompt=None):
         pass
 
-    @abstractmethod
-    def pretty_print_items(self, items, title=None):
-        pass
 
 
