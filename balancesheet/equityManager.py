@@ -1,11 +1,11 @@
 import balancesheet.mongoData.equities_data_service as dsvce
-from userInteraction.interfaces.IAtomicInteractionHelper import UserIteractionManager
+from userInteraction.financeCliInteraction import FinanceCliInteraction
 import ledgerkeeper.mongoData.account_data_service as dsvca
 from balancesheet.enums import EquityClass, AssetType, LiabiltyType, EquityTimeHorizon, EquityStatus, EquityContingency
 import plotter as plot
 
 class EquityManager():
-    def __init__(self, user_notification_system: UserIteractionManager):
+    def __init__(self, user_notification_system: FinanceCliInteraction):
         self.uns = user_notification_system
 
 

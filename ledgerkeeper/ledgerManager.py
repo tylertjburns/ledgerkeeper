@@ -1,7 +1,7 @@
 
 from ledgerkeeper.enums import HandleTransactionMethod, TransactionTypes, TransactionStatus, \
     TransactionSplitType, SpendCategory, AccountStatus, PaymentType, TransactionSource
-from enums import CollectionType
+from coreEnums import CollectionType
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
 from userInteraction.interfaces.IFinanceInteraction import IFinanceInteraction
@@ -56,6 +56,7 @@ class LedgerManager():
     def print_ledger(self):
         account = self.uns.select_account(statusList=[AccountStatus.ACTIVE.name])
         items_json = dsvcl.query_ledger("", account_names=[account.account_name]).to_json()
+
         self.uns.pretty_print_items(items_json, title=CollectionType.LEDGER.name)
 
     def delete_a_ledger_item(self):

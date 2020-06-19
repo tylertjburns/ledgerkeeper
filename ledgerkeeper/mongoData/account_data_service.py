@@ -3,8 +3,9 @@ import datetime
 from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.mongoData.bucket import Bucket
 from ledgerkeeper.mongoData.openBalance import OpenBalance
-from ledgerkeeper.enums import SpendCategory, AccountStatus, AccountType
+from ledgerkeeper.enums import SpendCategory, AccountStatus, AccountType, PaymentMethod
 from typing import List, Dict
+import logging
 
 def enter_account_if_not_exists(name: str,
                                 description: str,
@@ -57,6 +58,9 @@ def add_bucket_to_account(account: Account,
                           waterfall_amount: float = 0.0,
                           saved_amount: float = 0.0,
                           percent_of_income_adjustment_amount:float = 0.0,
+                          payment_method: PaymentMethod = None,
+                          payment_account: str = None,
+                          provider: str = None
                           ) -> Bucket:
     bucket = Bucket()
     bucket.name = name
@@ -68,6 +72,9 @@ def add_bucket_to_account(account: Account,
     bucket.waterfall_amount = waterfall_amount
     bucket.saved_amount = saved_amount
     bucket.percent_of_income_adjustment_amount = percent_of_income_adjustment_amount
+    if payment_account: bucket.payment_account = payment_account
+    if payment_method: bucket.payment_method = payment_method.name
+    if provider: bucket.provider = provider
 
     account = Account.objects(id=account.id).first()
     account.buckets.append(bucket)
@@ -84,21 +91,39 @@ def update_bucket(account: Account, bucketName: str,
                   waterfall_amount: float = None,
                   saved_amount: float = None,
                   percent_of_income_adjustment_amount: float = None,
+                  payment_method: PaymentMethod = None,
+                  payment_account: str = None,
+                  provider: str = None
                   ):
 
     bucket = bucket_by_account_and_name(account, bucketName)
-
-    bucket.update(
-        priority = priority if priority else bucket.priority,
-        due_day_of_month = due_day_of_month if due_day_of_month else bucket.due_day_of_month,
-        spend_category = spend_category.name if spend_category else bucket.spend_category,
-        base_budget_amount = base_budget_amount if base_budget_amount else bucket.base_budget_amount,
-        perc_budget_amount = perc_budget_amount if perc_budget_amount else bucket.perc_budget_amount,
-        waterfall_amount = waterfall_amount if waterfall_amount else bucket.waterfall_amount,
-        saved_amount = saved_amount if saved_amount else bucket.saved_amount,
-        percent_of_income_adjustment_amount = percent_of_income_adjustment_amount if percent_of_income_adjustment_amount else bucket.percent_of_income_adjustment_amount
-    )
-    bucket.reload()
+    if bucket is not None:
+        bucket.priority = priority if priority else bucket.priority
+        bucket.due_day_of_month = due_day_of_month if due_day_of_month else bucket.due_day_of_month
+        bucket.spend_category = spend_category.name if spend_category else bucket.spend_category
+        bucket.base_budget_amount = base_budget_amount if base_budget_amount else bucket.base_budget_amount
+        bucket.perc_budget_amount = perc_budget_amount if perc_budget_amount else bucket.perc_budget_amount
+        bucket.waterfall_amount = waterfall_amount if waterfall_amount else bucket.waterfall_amount
+        bucket.saved_amount = saved_amount if saved_amount else bucket.saved_amount
+        bucket.percent_of_income_adjustment_amount = percent_of_income_adjustment_amount if percent_of_income_adjustment_amount else bucket.percent_of_income_adjustment_amount
+        bucket.provider = provider if provider else bucket.provider
+        bucket.payment_account = payment_account if payment_account else bucket.payment_account
+        bucket.payment_method = payment_method.name if payment_method else bucket.payment_method
+    else:
+        bucket = add_bucket_to_account(account,
+                          bucketName,
+                          priority,
+                          due_day_of_month,
+                          spend_category,
+                          base_budget_amount,
+                          perc_budget_amount,
+                          waterfall_amount,
+                          saved_amount,
+                          percent_of_income_adjustment_amount,
+                          payment_method,
+                          payment_account,
+                          provider
+        )
 
     account.save()
 
@@ -106,9 +131,12 @@ def update_bucket(account: Account, bucketName: str,
 
 def bucket_by_account_and_name(account: Account
                                , bucketName: str):
-    # bucket = account.buckets.objects(name=bucketName).get()
-    bucket = [bucket for bucket in account.buckets if bucket.name == bucketName][0]
-    return bucket
+    buckets = [bucket for bucket in account.buckets if bucket.name.upper() == bucketName.upper()]
+    if len(buckets) == 0:
+        logging.error(f"No buckets matching bucketName: {bucketName} for account: {account.account_name}")
+        return None
+
+    return buckets[0]
 
 def update_bucket_saved_amount(account: Account
                          , bucketName: str
@@ -213,9 +241,12 @@ def buckets_as_dict_by_account(account: Account, exceptedValues=None) -> Dict[in
     return {i + 1: buckets[i].name for i in range(0, len(buckets))}
 
 def bucket_by_name(account:Account, bucket_name: str) -> Bucket:
-    return Bucket.objects()\
-        .filter(name=bucket_name)\
-        .filter(account__name=account.name).first()
+    buckets = Account.objects(id=account.id).first().buckets
+    bucket = next((bucket for bucket in buckets if bucket.name == bucket_name), None)
+    return bucket
+    # return Bucket.objects()\
+    #     .filter(name=bucket_name)\
+    #     .filter(account__name=account.account_name).first()
 
 def spend_category_by_bucket_name(account:Account, bucket_name) -> str:
     return bucket_by_account_and_name(account=account, bucketName=bucket_name).spend_category
@@ -223,8 +254,10 @@ def spend_category_by_bucket_name(account:Account, bucket_name) -> str:
 
 
 def delete_bucket_from_account(account, bucketName):
-    bucket = bucket_by_name(account, bucketName)
-    bucket.delete()
+    # bucket = bucket_by_name(account, bucketName)
+    success = Account.objects(id=account.id).update_one(pull__buckets__name=bucketName)
+    return success
+    # bucket.delete()
 
 def add_open_balance_to_account(account:Account, balanceName: str, balanceValue: float):
     balance = OpenBalance()
@@ -257,7 +290,7 @@ def balances_as_dict_by_account(account: Account, exceptedValues=None):
 def balances_by_account(account:Account, raw_return=False) -> List[OpenBalance]:
 
     balances = Account.objects(id=account.id).first().openBalances
-
+    logging.debug(balances)
     if raw_return:
         return balances.as_pymongo()
     else:

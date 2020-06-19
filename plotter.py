@@ -25,12 +25,12 @@ def plot_history_by_category(recent_months:int, print_data=False, account: Accou
     if account is None:
         ledger_items = dsvcl.query_ledger("", True)
     else:
-        ledger_items = dsvcl.query_ledger("")
+        ledger_items = dsvcl.query_ledger("", account_names=[account.account_name])
 
     data = pd.DataFrame(ledger_items)
     start_date = datetime.datetime.now() - relativedelta(months=+recent_months)
     spent = dsvcl.expense_history(start_date, end_date=datetime.datetime.today(), )
-    spent = spent[(spent['spend_category'] != SpendCategory.NOEXPENSE.name)]
+    spent = spent[(spent['spend_category'] != SpendCategory.NOEXPENSE.name) & (spent['spend_category'] != SpendCategory.NOTAPPLICABLE.name)]
 
 
     if print_data:
@@ -43,6 +43,8 @@ def plot_history_by_category(recent_months:int, print_data=False, account: Accou
         _print_df(grouped_spent)
 
     pivot = pd.pivot_table(grouped_spent, values=['debit'], index=['date_stamp'], columns=['spend_category']).fillna(0)
+    """ Re-Order the columns based on their sum"""
+    pivot = pivot.reindex(pivot.sum().sort_values(ascending=False).index, axis=1)
 
     if print_data:
         _print_df(pivot)
@@ -232,6 +234,6 @@ if __name__ == "__main__":
     import mongo_setup
     mongo_setup.global_init()
 
-    # plot_history_by_category(10, True)
-    plot_projected_finance(10, 10, 10000)
+    plot_history_by_category(10, True)
+    # plot_projected_finance(10, 10, 10000)
     # plot_assets_liabilities_worth_over_time(relevant_months=5, print_data=True, accountIds=["5e625935df67fa15ba672615"])

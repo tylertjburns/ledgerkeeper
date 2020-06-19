@@ -5,7 +5,7 @@ import balancesheet.mongoData.equities_data_service as dsvce
 
 import ledgerkeeper.dataFileTranslation as dft
 from ledgerkeeper.enums import TransactionSource
-from enums import CollectionType, ReportType, PlotType
+from coreEnums import CollectionType, ReportType, PlotType
 import ledgerkeeper.ledgerManager as lm
 import ledgerkeeper.accountManager as am
 import balancesheet.equityManager as em
@@ -277,7 +277,7 @@ def exit_app():
 
 def process_transactions_loop():
     print('******************** Process Transaction ***************')
-    transactionManager.process_transactions_loop(accountManager)
+    transactionManager.process_transactions_loop()
 
 def load_new_transactions():
     print('******************** Load New Transactions *************')
@@ -289,6 +289,9 @@ def load_new_transactions():
         3: TransactionSource.ARCHIVE.name
     }
     )
+
+    if source is None:
+        return
 
     # Get Filepath
     in_path = userInteraction.request_open_filepath()
@@ -365,7 +368,11 @@ def enter_transaction():
     accountManager.enter_manual_transaction(ledgerManager)
 
 if __name__ == "__main__":
+    import logging
+    import loggingConfig
     import mongo_setup
+
+    loggingConfig.initLogging(loggingLvl=logging.DEBUG)
     mongo_setup.global_init()
 
     main()

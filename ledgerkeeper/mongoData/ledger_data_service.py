@@ -56,7 +56,8 @@ def enter_ledger_entry(transaction_id: str,
                        spend_category: SpendCategory,
                        payment_type: PaymentType,
                        date_stamp: datetime.datetime = datetime.datetime.now,
-                       notes: str = "") -> LedgerItem:
+                       notes: str = "",
+                       amount_covered: int = 0) -> LedgerItem:
 
     ledger = LedgerItem()
     ledger.transaction_id = transaction_id
@@ -73,6 +74,7 @@ def enter_ledger_entry(transaction_id: str,
     ledger.payment_type = payment_type.name
     ledger.notes = notes
     ledger.source = source.name
+    ledger.amount_covered = amount_covered
 
     ledger.save()
 

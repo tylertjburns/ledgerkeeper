@@ -5,10 +5,11 @@ import pandas as pd
 import json
 import mongoHelper
 import pandasHelper
+import logging
 
 from ledgerkeeper.mongoData.account import Account
 from ledgerkeeper.enums import PaymentType, AccountType, SpendCategory, TransactionTypes, TransactionSplitType
-from enums import CollectionType
+from coreEnums import CollectionType
 
 class FinanceCliInteraction(IFinanceInteraction, CliInteractionManager):
 
@@ -195,6 +196,7 @@ class FinanceCliInteraction(IFinanceInteraction, CliInteractionManager):
 
     # region Printing
     def pretty_print_items(self, items, title=None):
+        logging.debug(items)
         if type(items) == str:
             data = pd.io.json.json_normalize(json.loads(items))
         elif type(items) is list:
@@ -203,6 +205,11 @@ class FinanceCliInteraction(IFinanceInteraction, CliInteractionManager):
             data = items
         else:
             raise NotImplementedError(f"Unhandled printable object {type(items)}")
+
+        """ Convert Dates"""
+        if 'date_stamp' in data.columns: data['date_stamp'] = pd.to_datetime(data['date_stamp'], unit='ms')
+        if 'date' in data.columns: data['date'] = pd.to_datetime(data['date'], unit='ms')
+        if 'date_stamp.$date' in data.columns: data['date_stamp.$date'] = pd.to_datetime(data['date_stamp.$date'], unit='ms')
 
         if title is None:
             title = ""

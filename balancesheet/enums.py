@@ -1,4 +1,4 @@
-from enums import MyEnum
+from coreEnums import MyEnum
 
 class EquityClass(MyEnum):
     ASSET = 1

@@ -93,7 +93,6 @@ def read_in_old_ledgers(filepath: str, account: Account):
     old_data = pd.read_csv(filepath, encoding='ISO-8859-1').fillna("")
 
 
-
     # Transalate old ledger data into standard ledger format
     old_ledgers = []
     for ledger in old_data.to_dict('rows'):
@@ -101,30 +100,44 @@ def read_in_old_ledgers(filepath: str, account: Account):
             debit = _float_from_dollar_string(ledger['Amount'])
             credit = 0.0
             transaction_category = TransactionTypes.RECORD_EXPENSE
+            from_account = account.account_name
+            to_account = 'External'
         elif ledger['Trans_Type'] == 'MOVING FUNDS':
             debit = _float_from_dollar_string(ledger['Amount'])
             credit = _float_from_dollar_string(ledger['Amount'])
             transaction_category = TransactionTypes.MOVE_FUNDS
+            from_account = account.account_name
+            to_account = account.account_name
         elif ledger['Trans_Type'] == 'ADD INCOME':
             debit = 0.0
             credit = _float_from_dollar_string(ledger['Amount'])
             transaction_category = TransactionTypes.APPLY_INCOME
+            from_account = 'External'
+            to_account = account.account_name
         elif ledger['Trans_Type'] == 'BALANCE BANK':
             debit = 0.0
             credit = _float_from_dollar_string(ledger['Amount'])
             transaction_category = TransactionTypes.BALANCE_BANK
+            from_account = account.account_name
+            to_account = account.account_name
         elif ledger['Trans_Type'] == "CHANGE MONTH":
             continue
         else:
             raise Exception(f"Unhandled transaction category for Archive: {ledger['Trans_Type']}")
 
         from_bucket = ledger['From']
-        to_account = ledger['To']
+        to_bucket = ledger['To']
+
+        amount_covered = 0
+        if ledger['Validated'] == 1 or ledger['Trans_Type'] != "APPLY PMNT":
+            amount_covered = debit
+
+
 
         if ledger['Spend_Cat'] == 'Car' and ledger['From'] == "Car (AUTO_PNC)":
-            spend_category = SpendCategory.CARPAYMENT
+            spend_category = SpendCategory.CAR_PAYMENT
         elif ledger['Spend_Cat'] == 'Car':
-            spend_category = SpendCategory.CARMAINT
+            spend_category = SpendCategory.CAR_MAINT
         else:
             spend_category = old_spend_category_switch(ledger['Spend_Cat'])
 
@@ -159,14 +172,15 @@ def read_in_old_ledgers(filepath: str, account: Account):
                                     , debit=debit
                                     , credit=credit
                                     , source=TransactionSource.ARCHIVE
-                                    , from_account=account.account_name
+                                    , from_account=from_account
                                     , from_bucket=from_bucket
-                                    , to_bucket=to_account
+                                    , to_bucket=to_bucket
                                     , to_account=to_account
                                     , spend_category=spend_category
                                     , payment_type=payment_type
                                     , date_stamp=parser.parse(ledger['Date'])
-                                    , notes=ledger['Comment'])
+                                    , notes=ledger['Comment']
+                                    , amount_covered=amount_covered)
 
 
         if new is not None:
@@ -187,20 +201,32 @@ def old_spend_category_switch(old:str):
             "Gas": SpendCategory.FUEL,
             "Giving": SpendCategory.CHARITY,
             "Groceries": SpendCategory.GROCERIES,
-            "Home Living": SpendCategory.GENERALHOMEEXPENSE,
-            "Insurance": SpendCategory.CARINSURANCE,
-            "Loan": SpendCategory.LOANPAYMENT,
+            "Home Living": SpendCategory.GENERAL_HOME_EXPENSE,
+            "Insurance": SpendCategory.CAR_INSURANCE,
+            "Loan": SpendCategory.LOAN_PAYMENT,
             "Medical": SpendCategory.MEDICAL,
             "Other": SpendCategory.OTHER,
             "Phone": SpendCategory.PHONE,
             "Rent / Mortgage": SpendCategory.RENT_MORTGAGE,
             "Rent/Mortgage": SpendCategory.RENT_MORTGAGE,
-            "Spending Allowance": SpendCategory.SPENDINGALLOWANCE,
+            "Spending Allowance": SpendCategory.SPENDING_ALLOWANCE,
             "Travel": SpendCategory.TRAVEL,
             "Utilities": SpendCategory.UTILITIES,
             "Vacation": SpendCategory.VACATION,
             "Wallace": SpendCategory.PETS,
-            "Work Meals": SpendCategory.GENERALLIVINGEXPENSE,
-            "Work Supplies": SpendCategory.OTHER
+            "Work Meals": SpendCategory.GENERAL_LIVING_EXPENSE,
+            "Work Supplies": SpendCategory.OTHER,
+            "Capital Payback": SpendCategory.CAPITAL_PAYBACK,
+            "Maintenance": SpendCategory.MAINTENANCE,
+            "Administration": SpendCategory.ADMINISTRATION,
+            "CAPEX": SpendCategory.CAPEX,
+            "Closing Cost": SpendCategory.CLOSING_COSTS,
+            "Inspections/Appraisals": SpendCategory.INSPECTION_APPRAISALS,
+            "Property Management": SpendCategory.PROPERTY_MANAGEMENT
         }
         return switcher[old]
+
+
+if __name__ == "__main__":
+    import datetime
+    print(datetime.datetime.fromtimestamp(1591569240000/1000.0).strftime('%Y-%m-%d %H:%M:%S.%f'))

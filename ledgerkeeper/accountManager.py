@@ -2,18 +2,18 @@ import ledgerkeeper.mongoData.account_data_service as dsvca
 import ledgerkeeper.mongoData.ledger_data_service as dsvcl
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
 from ledgerkeeper.mongoData.account import Account
-from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes, AccountStatus, DefaultBuckets, TransactionSource, PaymentType, TransactionStatus
-from enums import ReportType, CollectionType
-from userInteraction.interfaces.IFinanceInteraction import FinanceInteraction
+from ledgerkeeper.enums import SpendCategory, AccountType, TransactionTypes, AccountStatus, DefaultBuckets, TransactionSource, PaymentType, TransactionStatus, PaymentMethod
+from coreEnums import ReportType, CollectionType
+from userInteraction.financeCliInteraction import FinanceCliInteraction
 import mongoHelper
 import pandas as pd
 import uuid
 from sessionState import SessionState
 import plotter as plt
-
+import logging
 
 class AccountManager():
-    def __init__(self, user_interaction_system: FinanceInteraction):
+    def __init__(self, user_interaction_system: FinanceCliInteraction):
         self.uns = user_interaction_system
         self.state = SessionState()
 
@@ -43,7 +43,7 @@ class AccountManager():
     def _record_expense(self):
         trans_id = str(uuid.uuid4())
 
-        input = self.uns.get_record_expense_input()
+        input = self.uns.get_record_expense_input(self)
         if input is None:
             return
 
@@ -179,7 +179,7 @@ class AccountManager():
 
     def add_waterfall_funds(self, account:Account=None):
         account = account if account else self.uns.select_account()
-        input = self.uns.get_add_waterfall_funds_input()
+        input = self.uns.get_add_waterfall_funds_input(account=account)
 
         ''' Record funds into default account'''
         dsvcl.enter_ledger_entry("NA",
@@ -194,7 +194,8 @@ class AccountManager():
                                  spend_category=SpendCategory.NOTAPPLICABLE,
                                  date_stamp=input['date'],
                                  notes=input['notes'],
-                                 source=TransactionSource.MANUALENTRY)
+                                 source=TransactionSource.MANUALENTRY,
+                                 payment_type=PaymentType.NOTAPPLICABLE)
 
 
         ''' Obtain a sortable list of keys that will be used for iterating through the waterfall'''
@@ -252,7 +253,8 @@ class AccountManager():
                                      spend_category=SpendCategory.NOTAPPLICABLE,
                                      date_stamp=date,
                                      notes="",
-                                     source=TransactionSource.APPLICATION)
+                                     source=TransactionSource.APPLICATION,
+                                     payment_type=PaymentType.NOTAPPLICABLE)
 
         self.uns.notify_user(f"{amount - excess} applied to bucket {bucket.name}", delay_sec=0)
         return excess
@@ -277,9 +279,12 @@ class AccountManager():
         account = account if account else self.uns.select_account()
         input = self.uns.get_delete_bucket_from_account_input(account)
 
-        bucket = dsvca.delete_bucket_from_account(account, input['bucketName'])
+        ret = dsvca.delete_bucket_from_account(account, input['bucketName'])
 
-        self.uns.notify_user(f"Bucket {bucket.name} deleted from {account} successfully.")
+        if ret == 1:
+            self.uns.notify_user(f"Bucket {input['bucketName']} deleted from {account} successfully.")
+        else:
+            self.uns.notify_user(f"Error deleting bucket {input['bucketName']} from {account}.")
 
     def udpate_bucket_priority(self, account:Account=None):
         account = account if account else self.uns.select_account()
@@ -335,7 +340,7 @@ class AccountManager():
 
     def delete_open_balance(self, account:Account=None):
         account = account if account else self.uns.select_account()
-        input = self.uns.get_delete_open_balance_input()
+        input = self.uns.get_delete_open_balance_input(account)
 
         balance = dsvca.delete_open_balance_from_account(account, input['balanceName'])
 
@@ -352,14 +357,14 @@ class AccountManager():
 
         balances = dsvca.balances_by_account(account)
         self.uns.notify_user(f"\n------Balances------\n"
-                             f"Bank Total: ${self.float_as_currency(bankTotal)}\n"
-                             f"Allocated Total: ${self.float_as_currency(self.allocated_total(account))}", delay_sec=0)
+                             f"Bank Total: {self.float_as_currency(bankTotal)}\n"
+                             f"Allocated Total: {self.float_as_currency(self.allocated_total(account))}", delay_sec=0)
         self.uns.pretty_print_items(sorted(balances, key=lambda x: x.name),
                                     title=ReportType.OPENBALANCES.name)
 
         balance_total = self.check_balance_against_total(bankTotal, account=account)
         self.uns.notify_user(f"------------------------\n"
-                             f"Balance: ${self.float_as_currency(balance_total)}")
+                             f"Balance: {self.float_as_currency(balance_total)}")
 
     def check_balance_against_total(self, total: float, account:Account=None) -> float:
         account = account if account else self.uns.select_account()
@@ -392,27 +397,62 @@ class AccountManager():
     def buckets_from_csv(self, account: Account = None):
         account = account if account else self.uns.select_account()
 
+        self.uns.notify_user(f"Please select a .csv file containing the columns:"
+                             f"\n\tpriority"
+                             f"\n\tname"
+                             f"\n\tprovider"
+                             f"\n\tpayment_account"
+                             f"\n\tpayment_method"
+                             f"\n\tdue_day_of_month"
+                             f"\n\tspend_category"
+                             f"\n\tbase_budget_amount"
+                             f"\n\tperc_budget_amount"
+                             f"\n\twaterfall_amount"
+                             f"\n\tsaved_amount"
+                             f"\n\tpercent_of_income_adjustment_amount")
         filepath = self.uns.request_open_filepath()
         data = pd.read_csv(filepath)
         if data is None:
             return
 
-        self._update_buckets_from_dataframe(account, data)
-        self.uns.notify_user(f"Buckets data updated successfully from {filepath}")
+        ret = self._update_buckets_from_dataframe(account, data)
+        if ret:
+            self.uns.notify_user(f"Buckets data updated successfully from {filepath}")
 
     def _update_buckets_from_dataframe(self, account: Account, df: pd.DataFrame):
+        try:
+            logging.debug(df.dtypes)
+            for index, row in df.iterrows():
+                name = row['name']
+                logging.debug(row)
+                dsvca.update_bucket(account, name,
+                                    priority=int(row["priority"]),
+                                    due_day_of_month=int(row["due_day_of_month"]),
+                                    spend_category=SpendCategory[row["spend_category"].upper()],
+                                    base_budget_amount=float(row["base_budget_amount"]),
+                                    perc_budget_amount=float(row["perc_budget_amount"]),
+                                    waterfall_amount=float(row["waterfall_amount"]),
+                                    saved_amount=float(row["saved_amount"]),
+                                    percent_of_income_adjustment_amount=float(row["percent_of_income_adjustment_amount"]),
+                                    provider=row["provider"] if pd.notna(row["provider"]) else "",
+                                    payment_account=row["payment_account"] if pd.notna(row["payment_account"]) else "",
+                                    payment_method=PaymentMethod[row["payment_method"].upper()] if pd.notna(row["payment_method"]) else ""
+                                    )
 
-        for index, row in df.iterrows():
-            name = row['name']
-            dsvca.update_bucket(account, name,
-                                priority=row["priority"],
-                                due_day_of_month=row["due_day_of_month"],
-                                spend_category=SpendCategory[row["spend_category"]],
-                                base_budget_amount=row["base_budget_amount"],
-                                perc_budget_amount=row["perc_budget_amount"],
-                                waterfall_amount=row["waterfall_amount"],
-                                saved_amount=row["saved_amount"],
-                                percent_of_income_adjustment_amount=row["percent_of_income_adjustment_amount"])
+            bucket_names_imported = set(x.upper() for x in df['name'])
+            buckets = dsvca.buckets_by_account(account)
+            for bucket in buckets:
+                if bucket.name.upper() not in bucket_names_imported:
+                    dsvca.delete_bucket_from_account(account, bucket.name)
+
+            return True
+
+
+        except Exception as e:
+            error = f"Unable to import the dataset: {e}"
+            self.uns.notify_user(error)
+            self.uns.notify_user(df.columns)
+            return False
 
     def positive_remaining_buckets(self, account: Account=None, amount_threshold: float = None):
         account = account if account else self.uns.select_account()
@@ -437,7 +477,7 @@ class AccountManager():
     def plot_history_by_category(self):
         account = self.uns.select_account(statusList=[AccountStatus.ACTIVE.name])
         nMo = self.uns.request_int("Number of Relevant Months:")
-        plt.plot_history_by_category(nMo, account=account)
+        plt.plot_history_by_category(nMo, account=account, print_data=True)
 
     def plot_projected_finance(self):
         account = self.uns.select_account(statusList=[AccountStatus.ACTIVE.name])

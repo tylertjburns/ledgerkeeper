@@ -1,7 +1,7 @@
 
 from ledgerkeeper.enums import HandleTransactionMethod, TransactionTypes, TransactionStatus, \
     TransactionSplitType, SpendCategory, AccountStatus, PaymentType, TransactionSource
-from enums import CollectionType
+from coreEnums import CollectionType
 from ledgerkeeper.mongoData.transaction import Transaction
 import ledgerkeeper.mongoData.transaction_data_service as dsvct
 import ledgerkeeper.mongoData.account_data_service as dsvca

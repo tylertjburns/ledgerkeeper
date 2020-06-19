@@ -1,4 +1,4 @@
-from enums import MyEnum
+from coreEnums import MyEnum
 
 class TransactionTypes(MyEnum):
     APPLY_INCOME = 2  #Used for receiving funds into an account
@@ -34,27 +34,36 @@ class SpendCategory(MyEnum):
     RENT_MORTGAGE =2
     GROCERIES =3
     CHARITY =4
-    CARPAYMENT=5
-    CARMAINT = 6
+    CAR_PAYMENT=5
+    CAR_MAINT = 6
     FUN =7
-    SPENDINGALLOWANCE=8
+    SPENDING_ALLOWANCE=8
     OTHER=9
-    LOANPAYMENT = 10
+    LOAN_PAYMENT = 10
     FUEL = 11
     PHONE = 12
     UTILITIES = 13
     PETS = 14
-    CARINSURANCE = 15
-    LIFEINSURANCE = 16
-    GENERALLIVINGEXPENSE = 17
+    CAR_INSURANCE = 15
+    LIFE_INSURANCE = 16
+    GENERAL_LIVING_EXPENSE = 17
     FOOD = 18
     VACATION = 19
-    GENERALHOMEEXPENSE = 20
+    GENERAL_HOME_EXPENSE = 20
     MEDICAL = 21
     CABLE_INTERNET = 22
     TRAVEL = 23
     NOEXPENSE = 24
     NOTAPPLICABLE = 25
+    CAPITAL_PAYBACK = 26
+    MAINTENANCE = 27
+    ADMINISTRATION = 28
+    CAPEX = 29
+    CLOSING_COSTS = 30
+    INSPECTION_APPRAISALS = 31
+    PROPERTY_MANAGEMENT = 32
+
+
 
 class HandleTransactionMethod(MyEnum):
     SPLIT = 1
@@ -79,6 +88,13 @@ class PaymentType(MyEnum):
     BANK = 3
     NOTAPPLICABLE = 4
 
+class PaymentMethod(MyEnum):
+    AUTO_WITHDRAW = 1
+    AUTO_CREDIT = 2
+    MANUAL = 3
+
 if __name__ == "__main__":
-    enum = TransactionSource
+    enum = SpendCategory
+
+    print(SpendCategory['INVESTMENT'].name)
     print(enum.has_value(1))
